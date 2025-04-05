@@ -7,11 +7,11 @@ colorama==0.4.6
 Flask==2.2.2
 Flask-Cors==5.0.1
 Flask-SQLAlchemy==2.5.1
-google-auth==2.14.0           # Updated to a higher version for compatibility
+google-auth==1.12.0           # Downgraded to match `gspread` requirements
 google-auth-httplib2==0.2.0
-google-auth-oauthlib==0.4.6
+google-auth-oauthlib==0.4.1    # Downgraded to match older `google-auth`
+gspread==5.1.1                 # Downgraded to match older `google-auth`
 greenlet==2.0.1
-gspread==5.7.0
 httplib2==0.22.0
 idna==3.4
 itsdangerous==2.1.2
