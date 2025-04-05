@@ -382,16 +382,14 @@ def dashboard(creator_id):
 @app.route('/manager', methods=['GET', 'POST'])
 def manager():
     if not session.get('logged_in'):
-        return redirect(url_for('login'))  # Redirect to login page if not logged in
+        return redirect(url_for('login'))
         
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    # Fetch all creators
     cursor.execute("SELECT id, username, cpm FROM creators")
     creators = cursor.fetchall()
 
-    # Fetch all submissions
     cursor.execute('''SELECT submissions.id, submissions.reel_link, submissions.submission_time, 
                       submissions.status, submissions.rejection_reason, submissions.views, submissions.earnings, 
                       creators.username, submissions.creator_id 
