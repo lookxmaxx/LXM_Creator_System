@@ -7,7 +7,7 @@ colorama==0.4.6
 Flask==2.2.2
 Flask-Cors==5.0.1
 Flask-SQLAlchemy==2.5.1
-google-auth==1.12.0
+google-auth==2.14.0           # Updated to a higher version for compatibility
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==0.4.6
 greenlet==2.0.1
