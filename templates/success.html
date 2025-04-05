@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Submission Successful</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background-color: #0a0a0a;
+            color: #55eb42;
+            font-family: 'Montserrat', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+        }
+
+        .success-container {
+            position: relative;
+            width: 80%;
+            max-width: 500px;
+            padding: 40px;
+            border-radius: 15px;
+            background: linear-gradient(145deg, #101010, #1a1a1a);
+            box-shadow: 0 0 15px #4a4a4a, 0 0 30px #1f1f1f;
+            text-align: center;
+            animation: fadeIn 1.5s ease;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #ffffff;
+            animation: glowText 2s infinite alternate;
+            text-shadow: 0 0 10px #ffffff, 0 0 20px #ffffff, 0 0 30px #ffffff;
+        }
+
+        p {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            color: #b3b3b3;
+        }
+
+        a {
+            display: inline-block;
+            padding: 10px 30px;
+            border-radius: 10px;
+            background-color: #1e1e1e;
+            color: #ffffff;
+            text-decoration: none;
+            transition: all 0.3s;
+            box-shadow: 0 0 10px #ffffff;
+        }
+
+        a:hover {
+            background-color: #ffffff;
+            color: #0a0a0a;
+            border: 1px solid #ffffff;
+            box-shadow: 0 0 20px #ffffff, 0 0 40px #ffffff;
+        }
+
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes glowText {
+            0% { text-shadow: 0 0 5px #ffffff, 0 0 10px #ffffff, 0 0 20px #ffffff; }
+            100% { text-shadow: 0 0 15px #ffffff, 0 0 30px #ffffff, 0 0 40px #ffffff; }
+        }
+
+        .logo-background {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            background: url('{{ url_for('static', filename='lxm_logo.jpg') }}') no-repeat center;
+            background-size: cover;
+            opacity: 0.04;
+            filter: blur(6px);
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-background"></div>
+    <div class="success-container">
+        <h1>Submission Successful!</h1>
+        <p>Your reel has been successfully submitted.</p>
+        <a href="{{ url_for('submit', creator_id=creator_id) }}">Go back to Submission Page</a>
+    </div>
+</body>
+</html>

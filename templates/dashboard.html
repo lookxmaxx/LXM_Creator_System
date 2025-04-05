@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creator Dashboard</title>
+</head>
+<body>
+    <h1>Creator Dashboard</h1>
+
+    <h2>Your Submissions</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Reel Link</th>
+                <th>Submission Time</th>
+                <th>Status</th>
+                <th>Rejection Reason</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for submission in submissions %}
+                <tr>
+                    <td><a href="{{ submission[0] }}" target="_blank">{{ submission[0] }}</a></td>
+                    <td>{{ submission[1] }}</td>
+                    <td>{{ submission[2] }}</td>
+                    <td>{{ submission[3] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+<h2>Your Earnings</h2>
+<table border="1">
+    <thead>
+        <tr>
+            <th>Reel Link</th>
+            <th>Status</th>
+            <th>Views</th>
+            <th>Earnings (₹)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for submission in submissions %}
+            <tr>
+                <td><a href="{{ submission[0] }}" target="_blank">{{ submission[0] }}</a></td>
+                <td>{{ submission[2] }}</td>
+                <td>{{ submission[4] }}</td>
+                <td>{{ submission[5] }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h3>Total Earnings: ₹{{ total_earnings }}</h3>
+
+    <h2>Announcements</h2>
+    {% if announcements %}
+        <ul>
+            {% for announcement in announcements %}
+                <li><strong>{{ announcement[1] }}</strong>: {{ announcement[0] }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No announcements yet.</p>
+    {% endif %}
+
+    <br><br>
+    <a href="/">Back to Home</a>
+</body>
+</html>

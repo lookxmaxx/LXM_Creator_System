@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manager Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            background-color: #0d0d0d;
+            color: #f0f0f0;
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        h1, h2 {
+            text-align: center;
+            padding: 20px;
+            color: #ffffff;
+            text-shadow: 0 0 5px #ffffff;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1400px;
+            margin: auto;
+            padding: 30px;
+            background: #111111;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+            animation: fadeIn 1.2s ease-in-out;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 30px;
+            border-collapse: collapse;
+            background-color: #1a1a1a;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #333;
+        }
+
+        th {
+            background-color: #0d0d0d;
+            color: #ffffff;
+        }
+
+        tr:hover {
+            background-color: #252525;
+        }
+
+        button {
+            background-color: #ffffff;
+            color: #0d0d0d;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 5px #ffffff;
+        }
+
+        button:hover {
+            background-color: #0d0d0d;
+            color: #ffffff;
+            border: 1px solid #ffffff;
+        }
+
+        input, select, textarea {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border: 1px solid #333;
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #ffffff;
+            box-shadow: 0 0 10px #ffffff;
+        }
+
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(-20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Manager Dashboard</h1>
+    <div class="container">
+        <!-- Add New Creator Form -->
+        <h2>Add New Creator</h2>
+        <form action="/add_creator" method="POST">
+            <input type="text" name="creator_id" placeholder="Creator ID" required>
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="number" name="cpm" placeholder="CPM" required>
+            <button type="submit">Add Creator</button>
+        </form>
+
+<!-- All Creators Table -->
+        <h2>All Creators</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>S.No.</th>
+                    <th>Creator ID</th>
+                    <th>Username</th>
+                    <th>CPM</th>
+                    <th>Unique Submit Link</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for creator in creators %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ creator[0] }}</td>
+                    <td>{{ creator[1] }}</td>
+                    <td>{{ creator[2] }}</td>
+                    <td><a href="/submit/{{ creator[0] }}" target="_blank" style="color: #00bfff;">/submit/{{ creator[0] }}</a></td>
+                    <td>
+                        <form action="/update_cpm" method="POST" style="display:inline;">
+                            <input type="hidden" name="creator_id" value="{{ creator[0] }}">
+                            <input type="number" name="new_cpm" placeholder="New CPM" required>
+                            <button type="submit">Update CPM</button>
+                        </form>
+                        <form action="/delete_creator" method="POST" style="display:inline;">
+                            <input type="hidden" name="creator_id" value="{{ creator[0] }}">
+                            <button type="submit" style="background-color: red;">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+
+
+        <!-- Update CPM Form -->
+        <h2>Update CPM</h2>
+        <form action="/update_cpm" method="POST">
+            <select name="creator_id" required>
+                {% for creator in creators %}
+                    <option value="{{ creator[0] }}">{{ creator[1] }} (CPM: ₹{{ creator[2] }})</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="new_cpm" placeholder="New CPM" required>
+            <button type="submit">Update CPM</button>
+        </form>
+
+        <!-- Submissions Table with Filters -->
+        <h2>Submissions</h2>
+        <button onclick="filterTable('all')">All</button>
+        <button onclick="filterTable('pending')">Pending</button>
+        <button onclick="filterTable('approved')">Approved</button>
+        <button onclick="filterTable('rejected')">Rejected</button>
+        <input type="text" id="searchInput" onkeyup="searchTable()" placeholder="Search by Link">
+
+    <table>
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Reel Link</th>
+            <th>Submission Time</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for submission in submissions %}
+        <tr class="submission-row" data-status="{{ submission[3] | lower }}">
+            <td>{{ submission[7] }}</td>
+            <td>{{ submission[1] }}</td>
+            <td>{{ submission[2] }}</td>
+            <td>{{ submission[3] }}</td>
+            <td>
+                <div class="action-buttons">
+                    <form action="/update_submission" method="POST" style="display:inline;">
+                        <input type="hidden" name="submission_id" value="{{ submission[0] }}">
+                        <button name="action" value="approve" class="action-button approve-button">Approve</button>
+                    </form>
+
+                    <form action="/update_submission" method="POST" style="display:inline;">
+                        <input type="hidden" name="submission_id" value="{{ submission[0] }}">
+                        <input type="text" name="rejection_reason" placeholder="Reason" required>
+                        <button name="action" value="reject" class="action-button reject-button">Reject</button>
+                    </form>
+
+                    <form action="/update_submission" method="POST" style="display:inline;">
+                        <input type="hidden" name="submission_id" value="{{ submission[0] }}">
+                        <button name="action" value="re-review" class="action-button rereview-button">Re-Review</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+
+        <!-- Upload CSV Form -->
+        <h2>Upload CSV</h2>
+        <form action="/upload_csv" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".csv" required>
+            <button type="submit">Upload</button>
+        </form>
+
+        <!-- Announcements Form -->
+        <h2>Add Announcement</h2>
+        <form action="/add_announcement" method="POST">
+            <textarea name="message" placeholder="Announcement Message" required></textarea>
+            <button type="submit">Add Announcement</button>
+        </form>
+    </div>
+</body>
+</html>

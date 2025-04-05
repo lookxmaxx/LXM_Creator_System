@@ -1,0 +1,142 @@
+body {
+    background-color: #0A0A0A;
+    color: #F0F0F0;
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+/* Glowing Effect */
+.glow {
+    text-shadow: 0 0 5px #FFFFFF, 0 0 10px #FFFFFF, 0 0 20px #FFFFFF, 0 0 40px #00FF99, 0 0 80px #00FF99;
+}
+
+/* Navbar Styling */
+.navbar {
+    background-color: #151515;
+    padding: 15px;
+    text-align: center;
+}
+
+.navbar h1 {
+    color: #FFFFFF;
+    font-size: 2.5rem;
+}
+
+/* Buttons */
+button {
+    background-color: #1E1E1E;
+    border: 1px solid #00FF99;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+    color: white;
+}
+
+button:hover {
+    background-color: #00FF99;
+    color: #0A0A0A;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #121212;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 20px;
+}
+
+table th, table td {
+    padding: 10px;
+    border-bottom: 1px solid #00FF99;
+    color: white;
+}
+
+table th {
+    background-color: #1E1E1E;
+}
+/* Action Buttons Styling */
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+/* General Styling for All Buttons */
+.action-button {
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.3s;
+    text-shadow: 0 0 5px #000;
+}
+
+/* Approve Button */
+.approve-button {
+    background-color: #0f9d58;
+    color: white;
+    box-shadow: 0 0 10px #0f9d58;
+}
+.approve-button:hover {
+    background-color: #0f9d58;
+    box-shadow: 0 0 20px #0f9d58, 0 0 40px #0f9d58;
+}
+
+/* Reject Button */
+.reject-button {
+    background-color: #db4437;
+    color: white;
+    box-shadow: 0 0 10px #db4437;
+}
+.reject-button:hover {
+    background-color: #db4437;
+    box-shadow: 0 0 20px #db4437, 0 0 40px #db4437;
+}
+
+/* Re-Review Button */
+.rereview-button {
+    background-color: #f4b400;
+    color: white;
+    box-shadow: 0 0 10px #f4b400;
+}
+.rereview-button:hover {
+    background-color: #f4b400;
+    box-shadow: 0 0 20px #f4b400, 0 0 40px #f4b400;
+}
+
+/* Forms */
+form {
+    display: flex;
+    flex-direction: column;
+    margin: 20px 0;
+}
+
+input, textarea {
+    background-color: #1E1E1E;
+    border: 1px solid #00FF99;
+    padding: 10px;
+    border-radius: 5px;
+    color: white;
+    margin-bottom: 10px;
+}
+
+/* Background with Logo */
+body::before {
+    content: "";
+    background: url('/static/lxm_logo.png') no-repeat center center fixed;
+    background-size: 20%;
+    opacity: 0.05;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+}
