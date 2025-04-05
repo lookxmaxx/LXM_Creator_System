@@ -15,6 +15,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# Load secret key for sessions
+app.secret_key = os.getenv("SECRET_KEY")
+# Load manager password from environment variable
+MANAGER_PASSWORD = os.getenv("MANAGER_PASSWORD")
 # Load Pushbullet API Key from environment variable
 PUSHBULLET_API_KEY = os.getenv("PUSHBULLET_API_KEY")
 if not PUSHBULLET_API_KEY:
@@ -260,11 +264,6 @@ def login():
             return "Invalid password. Try again.", 401
     return render_template('login.html')
 
-# Protect the manager page
-@app.route('/manager', methods=['GET', 'POST'])
-def manager():
-    if not session.get('authenticated'):
-        return redirect(url_for('login'))
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
@@ -390,6 +389,9 @@ def dashboard(creator_id):
     return render_template('dashboard.html', submissions=submissions, creator_id=creator_id, cpm=cpm, total_earnings=total_earnings, announcements=announcements)
 @app.route('/manager', methods=['GET', 'POST'])
 def manager():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+        
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
