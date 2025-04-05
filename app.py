@@ -252,16 +252,16 @@ def check_submission_dates():
     # Display results in a readable format
     return str(results)
 
-# Route for Login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        password = request.form.get('password')
-        if password == os.getenv("MANAGER_PASSWORD"):
-            session['authenticated'] = True
+        password = request.form['password']
+        if password == MANAGER_PASSWORD:
+            session['logged_in'] = True  # Store login state in session
             return redirect(url_for('manager'))
         else:
-            return "Invalid password. Try again.", 401
+            return render_template('login.html', error="Incorrect password. Please try again.")
+
     return render_template('login.html')
 
 
@@ -390,7 +390,7 @@ def dashboard(creator_id):
 @app.route('/manager', methods=['GET', 'POST'])
 def manager():
     if not session.get('logged_in'):
-        return redirect(url_for('login'))
+        return redirect(url_for('login'))  # Redirect to login page if not logged in
         
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
@@ -410,7 +410,6 @@ def manager():
     conn.close()
     
     return render_template('manager.html', creators=creators, submissions=submissions)
-
 
 # Route for Updating CPM
 @app.route('/update_cpm', methods=['POST'])
