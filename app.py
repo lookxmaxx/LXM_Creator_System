@@ -20,10 +20,7 @@ app.secret_key = os.getenv("SECRET_KEY")
 # Load manager password from environment variable
 MANAGER_PASSWORD = os.getenv("MANAGER_PASSWORD")
 # Load Pushbullet API Key from environment variable
-PUSHBULLET_API_KEY = os.getenv("PUSHBULLET_API_KEY")
-if not PUSHBULLET_API_KEY:
-    raise ValueError("PUSHBULLET_API_KEY is not set in the environment variables.")
-    
+PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
 
 # Load Google Application Credentials Path
@@ -83,7 +80,7 @@ def determine_month_range(date_string):
     
     return f"{start_month_name} {start_date.year} - {end_month_name} {end_date.year}"
 
-def sync_to_google_sheets():
+def sync_to_google_sheets():  # Make sure this definition is correct
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
     
@@ -109,17 +106,9 @@ def sync_to_google_sheets():
             month_range = "Invalid Date"
         
         rows_to_add.append([
-            row[0],  # Username
-            row[1],  # Reel Link
-            row[2],  # Views
-            row[3],  # Earnings
-            row[4],  # Creator ID
-            row[5],  # Status
-            row[6],  # Date Submitted
-            month_range  # Add calculated Month Range here
+            row[0], row[1], row[2], row[3], row[4], row[5], row[6], month_range
         ])
     
-    # Append rows to Google Sheet
     if rows_to_add:
         try:
             sheet.insert_rows(rows_to_add, row=2)
@@ -128,8 +117,6 @@ def sync_to_google_sheets():
             print(f"Failed to update Google Sheets: {e}")
 
     conn.close()
-
-
 
 def get_session_name(date_string):
     from datetime import datetime
@@ -149,13 +136,7 @@ def get_session_name(date_string):
         return f"November-December {year}"
     else:
         return f"January-February {year}"
-
-
-# Your Pushbullet Access Token
-PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
-
-# Initialize Pushbullet
-pb = Pushbullet(PUSHBULLET_API_KEY)
+        
 def connect_to_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
              "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
@@ -163,6 +144,7 @@ def connect_to_google_sheets():
     client = gspread.authorize(creds)
     sheet = client.open("LXM Creator Data").worksheet("Earnings")
     return sheet
+
 # Create Database
 def create_database():
     conn = sqlite3.connect('submissions.db')
@@ -246,6 +228,7 @@ def submit(creator_id):
 @app.route('/success/<creator_id>')
 def success(creator_id):
     return render_template('success.html', creator_id=creator_id)
+
     
 @app.route('/check_submission_dates')
 def check_submission_dates():
