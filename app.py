@@ -217,17 +217,19 @@ def create_database():
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
-        try:
-            reel_link = request.form['reel_link']
-            submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        reel_link = request.form['reel_link']
+        submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
 
-            conn = sqlite3.connect('submissions.db')
-            cursor = conn.cursor()
+        conn = sqlite3.connect('submissions.db')
+        cursor = conn.cursor()
 
-            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
-                           (reel_link, submission_time, creator_id))
-            conn.commit()
-            conn.close()
+        cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
+                       (reel_link, submission_time, creator_id))
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('success', creator_id=creator_id))  # Redirect to success page with creator_id
+    return render_template('submit.html', creator_id=creator_id)
 
             # Sync to Google Sheets
             sync_to_google_sheets()  # Make sure this function is defined correctly
@@ -238,6 +240,10 @@ def submit(creator_id):
             return "Submission Failed. Please try again.", 500
     return render_template('submit.html', creator_id=creator_id)
 
+@app.route('/success/<creator_id>')
+def success(creator_id):
+    return render_template('success.html', creator_id=creator_id)
+    
 @app.route('/check_submission_dates')
 def check_submission_dates():
     conn = sqlite3.connect('submissions.db')
