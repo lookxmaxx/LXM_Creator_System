@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 import sqlite3
 from datetime import datetime
 import gspread
@@ -17,15 +17,19 @@ CORS(app)
 
 # Load Pushbullet API Key from environment variable
 PUSHBULLET_API_KEY = os.getenv("PUSHBULLET_API_KEY")
+if not PUSHBULLET_API_KEY:
+    raise ValueError("PUSHBULLET_API_KEY is not set in the environment variables.")
+    
 pb = Pushbullet(PUSHBULLET_API_KEY)
 
 # Load Google Application Credentials Path
 credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if not credentials_path:
+    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS is not set in the environment variables.")
 
-# This line reads your credentials from the .env file
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-# Access your original token (if you need it in your code)
-YOUR_TOKEN = os.getenv("o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4")
+# This line ensures your credentials file is accessible
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
+
 def generate_dashboard_link(creator_id):
     script_url = "https://script.google.com/macros/s/AKfycbwJ775U48Q2EwS3g7TabdVPS1mzM6s3f8NVPazj7PZY1lIw08QwiN9ZZNuOuHca-xSHSw/exec"  # Replace with your deployed Google Apps Script URL
     params = {'creatorId': creator_id}
@@ -209,22 +213,26 @@ def create_database():
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
-        reel_link = request.form['reel_link']
-        submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        try:
+            reel_link = request.form['reel_link']
+            submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
 
-        conn = sqlite3.connect('submissions.db')
-        cursor = conn.cursor()
+            conn = sqlite3.connect('submissions.db')
+            cursor = conn.cursor()
 
-        cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
-                       (reel_link, submission_time, creator_id))
-        conn.commit()
-        conn.close()
+            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
+                           (reel_link, submission_time, creator_id))
+            conn.commit()
+            conn.close()
 
-        sync_to_google_sheets()  # Syncing to Google Sheets
+            # Sync to Google Sheets
+            sync_to_google_sheets()  # Make sure this function is defined correctly
 
-        return render_template('success.html', creator_id=creator_id)  # Pass creator_id to success page
+            return redirect(url_for('success', creator_id=creator_id))  # Ensure success.html exists in your templates folder
+        except Exception as e:
+            print(f"Error during submission: {e}")
+            return "Submission Failed. Please try again.", 500
     return render_template('submit.html', creator_id=creator_id)
-
 
 @app.route('/check_submission_dates')
 def check_submission_dates():
@@ -239,6 +247,24 @@ def check_submission_dates():
 
     # Display results in a readable format
     return str(results)
+
+# Route for Login
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == os.getenv("MANAGER_PASSWORD"):
+            session['authenticated'] = True
+            return redirect(url_for('manager'))
+        else:
+            return "Invalid password. Try again.", 401
+    return render_template('login.html')
+
+# Protect the manager page
+@app.route('/manager', methods=['GET', 'POST'])
+def manager():
+    if not session.get('authenticated'):
+        return redirect(url_for('login'))
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
