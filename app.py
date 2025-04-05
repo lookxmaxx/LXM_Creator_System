@@ -228,7 +228,10 @@ def submit(creator_id):
         conn.commit()
         conn.close()
 
-        return redirect(url_for('success', creator_id=creator_id))  # Redirect to success page with creator_id
+        # Make sure this line is properly indented within the function
+        sync_to_google_sheets()  
+
+        return redirect(url_for('success', creator_id=creator_id))
     return render_template('submit.html', creator_id=creator_id)
 
             # Sync to Google Sheets
