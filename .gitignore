@@ -1,0 +1,29 @@
+# Environment files
+.env
+service_account.json
+service-account-file.json
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE files
+.vscode/
+.idea/
+
+# MacOS specific files
+.DS_Store
+
+# Windows specific files
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Python virtual environments
+venv/
+env/
+
