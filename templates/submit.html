@@ -133,11 +133,12 @@
     <div class="submit-container">
         <div class="logo-container"></div>
         <h1>Submit Your Reel</h1>
-        <form method="POST">
-            <label for="reel_link">Reel Link:</label>
-            <input type="text" id="reel_link" name="reel_link" required>
-            <button type="submit">Submit</button>
-        </form>
+       <!-- submit.html -->
+<form method="POST" action="{{ url_for('submit', creator_id=creator_id) }}">
+    <label for="reel_link">Reel Link:</label><br>
+    <input type="text" id="reel_link" name="reel_link" required><br><br>
+    <button type="submit">Submit</button>
+</form>
     </div>
 </body>
 </html>
