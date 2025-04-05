@@ -9,7 +9,7 @@ Flask-Cors==5.0.1
 Flask-SQLAlchemy==2.5.1
 google-auth==1.12.0
 google-auth-httplib2==0.2.0
-google-auth-oauthlib==0.4.6
+google-auth-oauthlib==0.5.3  # Fixed to be compatible with gspread 5.7.0
 greenlet==2.0.1
 gspread==5.7.0
 httplib2==0.22.0
