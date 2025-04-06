@@ -250,23 +250,6 @@ def check_submission_dates():
     # Display results in a readable format
     return str(results)
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        password = request.form['password']
-        if password == MANAGER_PASSWORD:
-            session['logged_in'] = True  # Store login state in session
-            return redirect(url_for('manager'))
-        else:
-            return render_template('login.html', error="Incorrect password. Please try again.")
-
-    return render_template('login.html')
-
-@app.route('/success', defaults={'creator_id': None})
-@app.route('/success/<creator_id>')
-def success(creator_id):
-    return render_template('success.html', creator_id=creator_id)
-
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
     if 'file' not in request.files:
@@ -292,10 +275,11 @@ def upload_csv():
     cursor = conn.cursor()
     
     for index, row in filtered_data.iterrows():
-        reel_link = row['link'].strip().rstrip('/')  # Trim and remove trailing slash
+        reel_link = row['link'].strip().lower().rstrip('/')  # Make URL case-insensitive, trim spaces, remove trailing slash
         views = int(row['views'])  # Convert views to integer
         
-        cursor.execute("SELECT creator_id, id FROM submissions WHERE LOWER(TRIM(reel_link)) = LOWER(?)", (reel_link,))
+        # Check for link in the database with normalized URL
+        cursor.execute("SELECT creator_id, id FROM submissions WHERE LOWER(TRIM(reel_link)) = ?", (reel_link,))
         result = cursor.fetchone()
         
         if result:
@@ -309,17 +293,18 @@ def upload_csv():
                 
                 cursor.execute("UPDATE submissions SET views = ?, earnings = ? WHERE id = ?",
                                (views, earnings, submission_id))
-                print(f"Updated Reel: {reel_link} with {views} views and earnings: {earnings}")
+                print(f"✅ Updated Reel: {reel_link} with {views} views and earnings: {earnings}")
             else:
-                print(f"CPM not found for Creator ID: {creator_id}")
+                print(f"⚠️ CPM not found for Creator ID: {creator_id}")
         else:
-            print(f"Reel Link not found in the database: {reel_link}")
+            print(f"❌ Reel Link not found in the database: {reel_link}")
     
     conn.commit()
     conn.close()
     
     sync_to_google_sheets()  # Sync after uploading CSV
 
+    print("🎉 CSV Processing Completed Successfully!")
     return redirect(url_for('manager'))
 
 
