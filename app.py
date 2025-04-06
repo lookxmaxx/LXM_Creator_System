@@ -9,7 +9,8 @@ import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
 from urllib.parse import urlparse
-import pandas as pd import csv
+import pandas as pd 
+import csv
 # Load environment variables from the .env file
 load_dotenv()
 
