@@ -146,20 +146,24 @@ def process_csv(file_path):
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
-    with open(file_path, newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
+    try:
+        df = pd.read_csv(file_path)
         
-        for row in reader:
-            reel_link = row['Link'].strip().lower()
-            views = int(row['Views'].replace(",", "").strip())
-            
+        for index, row in df.iterrows():
+            reel_link = row['Link']
+            views = row['Views']
+
             cursor.execute('''UPDATE submissions 
-                              SET views = ?, earnings = ? 
-                              WHERE LOWER(reel_link) = ?''', 
-                           (views, calculate_earnings(views), reel_link))
+                              SET views = ?, earnings = views * CPM / 1000
+                              WHERE reel_link = ?''', (views, reel_link))
         
-    conn.commit()
-    conn.close()
+        conn.commit()
+        print("CSV processed successfully.")
+        
+    except Exception as e:
+        print(f"Error processing CSV: {e}")
+    finally:
+        conn.close()
 
 
 def get_session_name(date_string):
