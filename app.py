@@ -213,15 +213,18 @@ def create_database():
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
-        reel_link = request.form['reel_link']
+        reel_link = request.form['reel_link'].strip()  # Remove any extra spaces
+        if not reel_link.startswith("https://www.instagram.com/reel/"):
+            reel_link = "https://www.instagram.com/reel/" + reel_link  # Normalize the link
+        
         submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
 
         conn = sqlite3.connect('submissions.db')
         cursor = conn.cursor()
 
         try:
-            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
-                           (reel_link, submission_time, creator_id))
+            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id, status) VALUES (?, ?, ?, ?)",
+                           (reel_link, submission_time, creator_id, "Pending"))  # Include status column
             conn.commit()
             
             # Properly call the sync function AFTER committing data
@@ -235,6 +238,10 @@ def submit(creator_id):
             conn.close()
     return render_template('submit.html', creator_id=creator_id)
 
+# Define the Success Route
+@app.route('/success/<creator_id>')
+def success(creator_id):
+    return f"Submission Successful! You can now go back to your dashboard, Creator ID: {creator_id}"
     
 @app.route('/check_submission_dates')
 def check_submission_dates():
