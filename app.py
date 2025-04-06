@@ -275,11 +275,17 @@ def upload_csv():
     cursor = conn.cursor()
     
     for index, row in filtered_data.iterrows():
-        reel_link = row['link'].strip().lower().rstrip('/')  # Make URL case-insensitive, trim spaces, remove trailing slash
+        reel_link = row['link'].strip().lower().rstrip('/')  # Normalize the URL
         views = int(row['views'])  # Convert views to integer
+
+        # Normalize URL further
+        if 'instagram.com' in reel_link:
+            reel_link = reel_link.replace('https://www.instagram.com/reel/', 'https://www.instagram.com/reel/')
+        elif 'youtube.com' in reel_link:
+            reel_link = reel_link.replace('https://youtube.com/shorts/', 'https://youtube.com/shorts/')
         
         # Check for link in the database with normalized URL
-        cursor.execute("SELECT creator_id, id FROM submissions WHERE LOWER(TRIM(reel_link)) = ?", (reel_link,))
+        cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
         result = cursor.fetchone()
         
         if result:
