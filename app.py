@@ -276,18 +276,16 @@ def upload_csv():
     
     # Convert all column names to lowercase for case-insensitivity
     csv_data.columns = [col.strip().lower() for col in csv_data.columns]
-
-    # Log the columns for debugging
-    print("CSV Columns:", csv_data.columns)
+    print("CSV Columns:", csv_data.columns)  # Log CSV Columns
     
     # Ensure only the necessary columns are considered
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
-
+    
     # Rename 'link' to 'reel_link' to match the database column name
     csv_data = csv_data.rename(columns={'link': 'reel_link'})
-
-    # Log the filtered data for debugging
+    
+    # Print filtered data for debugging
     print("Filtered Data:\n", csv_data[['reel_link', 'views']])
     
     conn = sqlite3.connect('submissions.db')
@@ -329,6 +327,7 @@ def upload_csv():
     sync_to_google_sheets()  # Sync after uploading CSV
 
     return redirect(url_for('manager'))
+
 
 
 
