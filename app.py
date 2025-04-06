@@ -279,22 +279,22 @@ def upload_csv():
     import pandas as pd
     csv_data = pd.read_csv(file)
     
-    # Convert all column names to lowercase and strip any extra spaces
+    # Convert all column names to lowercase to make the code case-insensitive
     csv_data.columns = [col.strip().lower() for col in csv_data.columns]
-    
+
     # Ensure only the necessary columns are considered
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
 
     filtered_data = csv_data[['link', 'views']]
-    
+
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
     for index, row in filtered_data.iterrows():
-        reel_link = row['link'].strip().rstrip('/')  # Remove extra spaces and trailing slashes
+        reel_link = normalize_url(row['link'].strip())  # Normalize URL for clean matching
         views = int(row['views'])  # Convert views to integer
-
+        
         cursor.execute("SELECT creator_id, id FROM submissions WHERE TRIM(reel_link) = ?", (reel_link,))
         result = cursor.fetchone()
         
@@ -309,7 +309,7 @@ def upload_csv():
                 
                 cursor.execute("UPDATE submissions SET views = ?, earnings = ? WHERE id = ?",
                                (views, earnings, submission_id))
-                print(f"Updated: {reel_link} with views = {views} and earnings = {earnings}")
+                print(f"Updated Reel: {reel_link} with {views} views and earnings: {earnings}")
             else:
                 print(f"CPM not found for Creator ID: {creator_id}")
         else:
@@ -320,13 +320,7 @@ def upload_csv():
     
     sync_to_google_sheets()  # Sync after uploading CSV
 
-    print("CSV Processing Completed Successfully!")
     return redirect(url_for('manager'))
-
-
-
-
-
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
