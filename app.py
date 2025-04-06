@@ -278,13 +278,12 @@ def upload_csv():
         reel_link = row['link'].strip().lower().rstrip('/')  # Normalize the URL
         views = int(row['views'])  # Convert views to integer
 
-        # Normalize URL further
+        # Ensure URL normalization for comparison
         if 'instagram.com' in reel_link:
             reel_link = reel_link.replace('https://www.instagram.com/reel/', 'https://www.instagram.com/reel/')
         elif 'youtube.com' in reel_link:
             reel_link = reel_link.replace('https://youtube.com/shorts/', 'https://youtube.com/shorts/')
         
-        # Check for link in the database with normalized URL
         cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
         result = cursor.fetchone()
         
@@ -312,6 +311,7 @@ def upload_csv():
 
     print("🎉 CSV Processing Completed Successfully!")
     return redirect(url_for('manager'))
+
 
 
 # Route for Adding Announcements
