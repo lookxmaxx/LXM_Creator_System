@@ -9,7 +9,7 @@ import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
 from urllib.parse import urlparse
-import pandas as pd
+import pandas as pd import csv
 # Load environment variables from the .env file
 load_dotenv()
 
@@ -131,6 +131,26 @@ def sync_to_google_sheets():
 
     conn.close()
 
+
+
+def process_csv(file_path):
+    conn = sqlite3.connect('submissions.db')
+    cursor = conn.cursor()
+
+    with open(file_path, newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        
+        for row in reader:
+            reel_link = row['Link'].strip().lower()
+            views = int(row['Views'].replace(",", "").strip())
+            
+            cursor.execute('''UPDATE submissions 
+                              SET views = ?, earnings = ? 
+                              WHERE LOWER(reel_link) = ?''', 
+                           (views, calculate_earnings(views), reel_link))
+        
+    conn.commit()
+    conn.close()
 
 
 def get_session_name(date_string):
@@ -267,42 +287,18 @@ def upload_csv():
     if file.filename == '':
         return "No selected file", 400
 
-    try:
-        # Load CSV into pandas DataFrame
-        df = pd.read_csv(file)
-        df.columns = df.columns.str.strip()  # Remove extra spaces from headers
-
-        if 'Link' not in df.columns or 'Views' not in df.columns:
-            return "CSV must contain 'Link' and 'Views' columns.", 400
-
-        conn = sqlite3.connect('submissions.db')
-        cursor = conn.cursor()
-
-        for index, row in df.iterrows():
-            link = row['Link'].strip()
-            views = int(row['Views'])
-
-            # Ensure the link format is consistent for comparison
-            link = link.lower().strip().replace("https://", "").replace("www.", "").rstrip("/")
-            
-            # Update database with the views from CSV
-            cursor.execute("""
-                UPDATE submissions 
-                SET views = ?, earnings = ? 
-                WHERE TRIM(LOWER(REPLACE(reel_link, 'https://', ''))) = ?
-            """, (views, views * 0.75 / 1000, link))
-
-        conn.commit()
-        conn.close()
-
-        # Call sync_to_google_sheets after updating database
+    if file and file.filename.endswith('.csv'):
+        file_path = os.path.join(app.root_path, 'uploads', file.filename)
+        file.save(file_path)
+        
+        # Process the CSV file
+        process_csv(file_path)
+        
+        # Sync Google Sheets (IMPORTANT 🔥🔥)
         sync_to_google_sheets()
 
-        return "CSV Processing Completed Successfully!", 200
-    except Exception as e:
-        print(f"Error processing CSV: {e}")
-        return "Error processing CSV file.", 500
-
+        return redirect(url_for('manager'))
+    return "Invalid file type", 400
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
