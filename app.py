@@ -292,10 +292,10 @@ def upload_csv():
     cursor = conn.cursor()
     
     for index, row in filtered_data.iterrows():
-        reel_link = normalize_url(row['link'].strip())  # Normalize URL for clean matching
+        reel_link = row['link'].strip().rstrip('/')  # Trim and remove trailing slash
         views = int(row['views'])  # Convert views to integer
         
-        cursor.execute("SELECT creator_id, id FROM submissions WHERE TRIM(reel_link) = ?", (reel_link,))
+        cursor.execute("SELECT creator_id, id FROM submissions WHERE LOWER(TRIM(reel_link)) = LOWER(?)", (reel_link,))
         result = cursor.fetchone()
         
         if result:
@@ -321,6 +321,7 @@ def upload_csv():
     sync_to_google_sheets()  # Sync after uploading CSV
 
     return redirect(url_for('manager'))
+
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
