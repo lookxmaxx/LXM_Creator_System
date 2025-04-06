@@ -8,7 +8,7 @@ import os
 import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
-
+from urllib.parse import urlparse
 # Load environment variables from the .env file
 load_dotenv()
 
@@ -30,6 +30,11 @@ if not credentials_path:
 
 # This line ensures your credentials file is accessible
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
+
+def normalize_url(url):
+    parsed_url = urlparse(url)
+    normalized_url = parsed_url._replace(scheme="https", netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
+    return normalized_url.geturl()
 
 def generate_dashboard_link(creator_id):
     script_url = "https://script.google.com/macros/s/AKfycbwJ775U48Q2EwS3g7TabdVPS1mzM6s3f8NVPazj7PZY1lIw08QwiN9ZZNuOuHca-xSHSw/exec"  # Replace with your deployed Google Apps Script URL
