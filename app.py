@@ -214,30 +214,29 @@ def create_database():
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
-        reel_link = request.form['reel_link'].strip()  # Remove any extra spaces
-        if not reel_link.startswith("https://www.instagram.com/reel/"):
-            reel_link = "https://www.instagram.com/reel/" + reel_link  # Normalize the link
-        
+        reel_link = request.form['reel_link']
         submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
 
         conn = sqlite3.connect('submissions.db')
         cursor = conn.cursor()
 
         try:
-            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id, status) VALUES (?, ?, ?, ?)",
-                           (reel_link, submission_time, creator_id, "Pending"))  # Include status column
+            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
+                           (reel_link, submission_time, creator_id))
             conn.commit()
             
             # Properly call the sync function AFTER committing data
             sync_to_google_sheets()
 
-            return redirect(url_for('success', creator_id=creator_id))
+            # Render your enhanced success page instead of returning plain text
+            return render_template('success.html', creator_id=creator_id)
         except Exception as e:
             print(f"Error during submission: {e}")
             return "Submission Failed. Please try again.", 500
         finally:
             conn.close()
     return render_template('submit.html', creator_id=creator_id)
+
 
 # Define the Success Route
 @app.route('/success/<creator_id>')
