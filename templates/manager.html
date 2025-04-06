@@ -218,6 +218,11 @@
             <button type="submit">Upload</button>
         </form>
 
+<form action="/upload_csv" method="POST" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv">
+    <button type="submit">Upload CSV</button>
+</form>
+
         <!-- Announcements Form -->
         <h2>Add Announcement</h2>
         <form action="/add_announcement" method="POST">
