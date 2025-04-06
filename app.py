@@ -11,6 +11,12 @@ from dotenv import load_dotenv
 from urllib.parse import urlparse
 import pandas as pd 
 import csv
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
+ALLOWED_EXTENSIONS = {'csv'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 # Load environment variables from the .env file
 load_dotenv()
 
@@ -33,6 +39,8 @@ if not credentials_path:
 # This line ensures your credentials file is accessible
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
 
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme="https", netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
@@ -281,27 +289,35 @@ def check_submission_dates():
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
     if 'file' not in request.files:
+        print("No file part found in request.")
         return "No file part", 400
 
     file = request.files['file']
     
     if file.filename == '':
+        print("No selected file.")
         return "No selected file", 400
 
-    if file and file.filename.endswith('.csv'):
-        uploads_folder = os.path.join(app.root_path, 'uploads')
-        os.makedirs(uploads_folder, exist_ok=True)  # Ensure the uploads folder exists
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
-        file_path = os.path.join(uploads_folder, file.filename)
+        # Save file to server
         file.save(file_path)
         
-        # Process the CSV file
-        process_csv(file_path)
+        try:
+            # Process the CSV file
+            process_csv(file_path)
+            
+            # Sync Google Sheets (🔥 CRUCIAL 🔥)
+            sync_to_google_sheets()
+            
+            print("CSV Processing and Google Sheets sync completed successfully.")
+            return redirect(url_for('manager'))
         
-        # Sync Google Sheets (IMPORTANT 🔥🔥)
-        sync_to_google_sheets()
-
-        return redirect(url_for('manager'))
+        except Exception as e:
+            print(f"Error during CSV processing or syncing: {e}")
+            return f"Error during processing: {str(e)}", 500
     
     return "Invalid file type. Only CSV files are allowed.", 400
 
