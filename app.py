@@ -9,6 +9,7 @@ import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
 from urllib.parse import urlparse
+import pandas as pd
 # Load environment variables from the .env file
 load_dotenv()
 
@@ -259,66 +260,49 @@ def check_submission_dates():
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
-    if 'file' not in request.files:
-        return "No file part"
+    if 'csv_file' not in request.files:
+        return "No file part", 400
+
+    file = request.files['csv_file']
     
-    file = request.files['file']
     if file.filename == '':
-        return "No selected file"
-    
-    import pandas as pd
-    csv_data = pd.read_csv(file)
-    
-    # Convert all column names to lowercase to make the code case-insensitive
-    csv_data.columns = [col.strip().lower() for col in csv_data.columns]
+        return "No selected file", 400
 
-    # Ensure only the necessary columns are considered
-    if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
-        return "CSV file must contain 'Link' and 'Views' columns"
+    try:
+        # Load CSV into pandas DataFrame
+        df = pd.read_csv(file)
+        df.columns = df.columns.str.strip()  # Remove extra spaces from headers
 
-    filtered_data = csv_data[['link', 'views']]
+        if 'Link' not in df.columns or 'Views' not in df.columns:
+            return "CSV must contain 'Link' and 'Views' columns.", 400
 
-    conn = sqlite3.connect('submissions.db')
-    cursor = conn.cursor()
-    
-    for index, row in filtered_data.iterrows():
-        reel_link = row['link'].strip().lower().rstrip('/')  # Normalize the URL
-        views = int(row['views'])  # Convert views to integer
+        conn = sqlite3.connect('submissions.db')
+        cursor = conn.cursor()
 
-        # Ensure URL normalization for comparison
-        if 'instagram.com' in reel_link:
-            reel_link = reel_link.replace('https://www.instagram.com/reel/', 'https://www.instagram.com/reel/')
-        elif 'youtube.com' in reel_link:
-            reel_link = reel_link.replace('https://youtube.com/shorts/', 'https://youtube.com/shorts/')
-        
-        cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
-        result = cursor.fetchone()
-        
-        if result:
-            creator_id, submission_id = result
-            cursor.execute("SELECT cpm FROM creators WHERE id = ?", (creator_id,))
-            cpm_result = cursor.fetchone()
+        for index, row in df.iterrows():
+            link = row['Link'].strip()
+            views = int(row['Views'])
+
+            # Ensure the link format is consistent for comparison
+            link = link.lower().strip().replace("https://", "").replace("www.", "").rstrip("/")
             
-            if cpm_result:
-                cpm = cpm_result[0]
-                earnings = (views / 1000) * cpm
-                
-                cursor.execute("UPDATE submissions SET views = ?, earnings = ? WHERE id = ?",
-                               (views, earnings, submission_id))
-                print(f"✅ Updated Reel: {reel_link} with {views} views and earnings: {earnings}")
-            else:
-                print(f"⚠️ CPM not found for Creator ID: {creator_id}")
-        else:
-            print(f"❌ Reel Link not found in the database: {reel_link}")
-    
-    conn.commit()
-    conn.close()
-    
-    sync_to_google_sheets()  # Sync after uploading CSV
+            # Update database with the views from CSV
+            cursor.execute("""
+                UPDATE submissions 
+                SET views = ?, earnings = ? 
+                WHERE TRIM(LOWER(REPLACE(reel_link, 'https://', ''))) = ?
+            """, (views, views * 0.75 / 1000, link))
 
-    print("🎉 CSV Processing Completed Successfully!")
-    return redirect(url_for('manager'))
+        conn.commit()
+        conn.close()
 
+        # Call sync_to_google_sheets after updating database
+        sync_to_google_sheets()
+
+        return "CSV Processing Completed Successfully!", 200
+    except Exception as e:
+        print(f"Error processing CSV: {e}")
+        return "Error processing CSV file.", 500
 
 
 # Route for Adding Announcements
