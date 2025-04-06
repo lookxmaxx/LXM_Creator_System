@@ -101,14 +101,22 @@ def sync_to_google_sheets():
     for row in all_submissions:
         submission_date = row[6]  # Date Submitted
         try:
-            month_range = determine_month_range(submission_date)
+            month_range = determine_month_range(submission_date)  # Get the Month Range
         except:
             month_range = "Invalid Date"
         
         rows_to_add.append([
-            row[0], row[1], row[2], row[3], row[4], row[5], row[6], month_range
+            row[0],  # Username
+            row[1],  # Reel Link
+            row[2],  # Views
+            row[3],  # Earnings
+            row[4],  # Creator ID
+            row[5],  # Status
+            row[6],  # Date Submitted
+            month_range  # Add calculated Month Range here
         ])
     
+    # Append rows to Google Sheet
     if rows_to_add:
         try:
             sheet.insert_rows(rows_to_add, row=2)
@@ -117,6 +125,7 @@ def sync_to_google_sheets():
             print(f"Failed to update Google Sheets: {e}")
 
     conn.close()
+
 
 
 def get_session_name(date_string):
@@ -141,7 +150,7 @@ def get_session_name(date_string):
 def connect_to_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/spreadsheets",
              "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
+    creds = Credentials.from_service_account_file(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"), scopes=scope)
     client = gspread.authorize(creds)
     sheet = client.open("LXM Creator Data").worksheet("Earnings")
     return sheet
@@ -296,6 +305,12 @@ def upload_csv():
     
     conn.commit()
     conn.close()
+    
+    # Make sure the sync_to_google_sheets() is called here
+    sync_to_google_sheets()  
+
+    return redirect(url_for('manager'))
+
     
     sync_to_google_sheets()  # Sync after uploading CSV
 
