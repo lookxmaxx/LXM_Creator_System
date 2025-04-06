@@ -222,11 +222,6 @@ def submit(creator_id):
             conn.close()
     return render_template('submit.html', creator_id=creator_id)
 
-
-@app.route('/success/<creator_id>')
-def success(creator_id):
-    return render_template('success.html', creator_id=creator_id)
-
     
 @app.route('/check_submission_dates')
 def check_submission_dates():
@@ -254,6 +249,10 @@ def login():
 
     return render_template('login.html')
 
+@app.route('/success', defaults={'creator_id': None})
+@app.route('/success/<creator_id>')
+def success(creator_id):
+    return render_template('success.html', creator_id=creator_id)
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
@@ -348,9 +347,6 @@ def home():
 
 
 # Success Page Route
-@app.route('/success')
-def success():
-    return render_template('success.html')
 
 # Route for Creator Dashboard
 @app.route('/dashboard/<creator_id>')
