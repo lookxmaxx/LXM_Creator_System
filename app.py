@@ -275,42 +275,48 @@ def upload_csv():
     import pandas as pd
     csv_data = pd.read_csv(file)
     
-    # Convert all column names to lowercase for consistency
+    # Convert all column names to lowercase to avoid case sensitivity issues
     csv_data.columns = [col.strip().lower() for col in csv_data.columns]
-    
-    # Ensure the CSV file has the correct headers
+
+    # Ensure only the necessary columns are considered
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
 
-    # Rename the columns to match Google Sheets headers
-    csv_data.rename(columns={'link': 'Reel Link', 'views': 'Views'}, inplace=True)
-    
+    filtered_data = csv_data[['link', 'views']]
+
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    for index, row in csv_data.iterrows():
-        reel_link = row['Reel Link'].strip()  # Ensure clean string matching
-        views = int(row['Views'])  # Convert views to integer
+    for index, row in filtered_data.iterrows():
+        reel_link = row['link'].strip()  # Clean string to avoid issues
+        views = int(row['views'])  # Ensure views is treated as an integer
         
+        # Fetch submission ID and creator ID from the database
         cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
         result = cursor.fetchone()
         
         if result:
             creator_id, submission_id = result
+            
+            # Fetch CPM from the creators table
             cursor.execute("SELECT cpm FROM creators WHERE id = ?", (creator_id,))
             cpm_result = cursor.fetchone()
             
             if cpm_result:
                 cpm = cpm_result[0]
+                
+                # Calculate earnings
                 earnings = (views / 1000) * cpm
                 
+                # Update the submissions table with views and earnings
                 cursor.execute("UPDATE submissions SET views = ?, earnings = ? WHERE id = ?",
                                (views, earnings, submission_id))
     
     conn.commit()
     conn.close()
     
-    sync_to_google_sheets()  # Sync after uploading CSV
+    # Trigger Google Sheets sync AFTER updating the database
+    sync_to_google_sheets()
 
     return redirect(url_for('manager'))
 
