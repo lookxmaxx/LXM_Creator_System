@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import pandas as pd 
 import csv
 from werkzeug.utils import secure_filename
+import io
 
 UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
 ALLOWED_EXTENSIONS = {'csv'}
@@ -292,38 +293,32 @@ def check_submission_dates():
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
-    if 'file' not in request.files:
-        print("No file part found in request.")
+    if 'csv_file' not in request.files:
         return "No file part", 400
 
-    file = request.files['file']
+    file = request.files['csv_file']
     
     if file.filename == '':
-        print("No selected file.")
         return "No selected file", 400
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
-        # Save file to server
-        file.save(file_path)
-        
+    if file and file.filename.endswith('.csv'):
         try:
-            # Process the CSV file
-            process_csv(file_path)
+            # Read the file directly in memory without saving to disk
+            csv_data = file.read().decode('utf-8')
+            csv_file = io.StringIO(csv_data)
             
-            # Sync Google Sheets (🔥 CRUCIAL 🔥)
+            # Process the CSV data
+            process_csv(csv_file)  # Make sure process_csv function supports in-memory file processing
+            
+            # Sync Google Sheets (IMPORTANT 🔥🔥)
             sync_to_google_sheets()
             
-            print("CSV Processing and Google Sheets sync completed successfully.")
             return redirect(url_for('manager'))
-        
         except Exception as e:
-            print(f"Error during CSV processing or syncing: {e}")
-            return f"Error during processing: {str(e)}", 500
+            print(f"Error processing CSV file: {e}")
+            return "Failed to process CSV file", 500
     
-    return "Invalid file type. Only CSV files are allowed.", 400
+    return "Invalid file type", 400
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
