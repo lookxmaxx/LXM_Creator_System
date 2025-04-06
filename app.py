@@ -4,19 +4,15 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 from pushbullet import Pushbullet
-import os
 import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
 from urllib.parse import urlparse
 import pandas as pd 
+import io
+import os
 import csv
 from werkzeug.utils import secure_filename
-import io
-
-UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
-ALLOWED_EXTENSIONS = {'csv'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Load environment variables from the .env file
 load_dotenv()
@@ -24,6 +20,8 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+
+ALLOWED_EXTENSIONS = {'csv'}
 # Load secret key for sessions
 app.secret_key = os.getenv("SECRET_KEY")
 # Load manager password from environment variable
@@ -143,16 +141,16 @@ def sync_to_google_sheets():
 
 
 
-def process_csv(file_path):
+def process_csv(file):
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
     try:
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file)
         
         for index, row in df.iterrows():
             reel_link = row['Link']
-            views = row['Views']
+            views = int(row['Views'])
 
             cursor.execute('''UPDATE submissions 
                               SET views = ?, earnings = views * CPM / 1000
@@ -165,6 +163,7 @@ def process_csv(file_path):
         print(f"Error processing CSV: {e}")
     finally:
         conn.close()
+
 
 
 def get_session_name(date_string):
@@ -272,10 +271,10 @@ def submit(creator_id):
     return render_template('submit.html', creator_id=creator_id)
 
 
-# Define the Success Route
 @app.route('/success/<creator_id>')
 def success(creator_id):
-    return f"Submission Successful! You can now go back to your dashboard, Creator ID: {creator_id}"
+    return render_template('success.html', creator_id=creator_id)
+
     
 @app.route('/check_submission_dates')
 def check_submission_dates():
@@ -303,12 +302,12 @@ def upload_csv():
 
     if file and file.filename.endswith('.csv'):
         try:
-            # Read the file directly in memory without saving to disk
+            # Read the file directly in memory without saving to disk (Render can't save files)
             csv_data = file.read().decode('utf-8')
             csv_file = io.StringIO(csv_data)
             
-            # Process the CSV data
-            process_csv(csv_file)  # Make sure process_csv function supports in-memory file processing
+            # Process the CSV data directly
+            process_csv(csv_file)
             
             # Sync Google Sheets (IMPORTANT 🔥🔥)
             sync_to_google_sheets()
@@ -319,6 +318,7 @@ def upload_csv():
             return "Failed to process CSV file", 500
     
     return "Invalid file type", 400
+
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
