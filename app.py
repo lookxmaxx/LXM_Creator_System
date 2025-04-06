@@ -280,16 +280,19 @@ def check_submission_dates():
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
-    if 'csv_file' not in request.files:
+    if 'file' not in request.files:
         return "No file part", 400
 
-    file = request.files['csv_file']
+    file = request.files['file']
     
     if file.filename == '':
         return "No selected file", 400
 
     if file and file.filename.endswith('.csv'):
-        file_path = os.path.join(app.root_path, 'uploads', file.filename)
+        uploads_folder = os.path.join(app.root_path, 'uploads')
+        os.makedirs(uploads_folder, exist_ok=True)  # Ensure the uploads folder exists
+
+        file_path = os.path.join(uploads_folder, file.filename)
         file.save(file_path)
         
         # Process the CSV file
@@ -299,7 +302,8 @@ def upload_csv():
         sync_to_google_sheets()
 
         return redirect(url_for('manager'))
-    return "Invalid file type", 400
+    
+    return "Invalid file type. Only CSV files are allowed.", 400
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
