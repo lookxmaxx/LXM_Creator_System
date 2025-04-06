@@ -281,14 +281,17 @@ def upload_csv():
     # Ensure the required columns are present
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
+    
+    # Rename CSV columns to match your Google Sheets headers
+    csv_data.rename(columns={'link': 'reel link', 'views': 'views'}, inplace=True)
 
-    filtered_data = csv_data[['link', 'views']]
+    filtered_data = csv_data[['reel link', 'views']]
 
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
     for index, row in filtered_data.iterrows():
-        reel_link = row['link'].strip()  # Clean any unwanted spaces
+        reel_link = row['reel link'].strip()  # Clean any unwanted spaces
         views = int(row['views'])  # Convert views to integer
         
         cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
@@ -312,6 +315,7 @@ def upload_csv():
     sync_to_google_sheets()  # Sync after uploading CSV
 
     return redirect(url_for('manager'))
+
 
 
 
