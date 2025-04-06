@@ -274,24 +274,31 @@ def upload_csv():
     import pandas as pd
     csv_data = pd.read_csv(file)
     
-    # Convert all column names to lowercase to make the code case-insensitive
+    # Convert all column names to lowercase for case-insensitivity
     csv_data.columns = [col.strip().lower() for col in csv_data.columns]
 
-    # Check if the required columns are present
+    # Log the columns for debugging
+    print("CSV Columns:", csv_data.columns)
+    
+    # Ensure only the necessary columns are considered
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
-    
-    # Rename 'link' column to 'reel_link' for compatibility with the database
+
+    # Rename 'link' to 'reel_link' to match the database column name
     csv_data = csv_data.rename(columns={'link': 'reel_link'})
 
-    filtered_data = csv_data[['reel_link', 'views']]
-
+    # Log the filtered data for debugging
+    print("Filtered Data:\n", csv_data[['reel_link', 'views']])
+    
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    for index, row in filtered_data.iterrows():
+    for index, row in csv_data.iterrows():
         reel_link = row['reel_link'].strip()  # Ensure clean string matching
         views = int(row['views'])  # Convert views to integer
+        
+        # Log the reel_link and views to confirm correct data retrieval
+        print(f"Processing: Reel Link = {reel_link}, Views = {views}")
         
         cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
         result = cursor.fetchone()
@@ -305,15 +312,24 @@ def upload_csv():
                 cpm = cpm_result[0]
                 earnings = (views / 1000) * cpm
                 
+                # Update the submission
                 cursor.execute("UPDATE submissions SET views = ?, earnings = ? WHERE id = ?",
                                (views, earnings, submission_id))
+                print(f"Updated: {reel_link} with {views} views and {earnings} earnings")
+            else:
+                print(f"CPM not found for Creator ID: {creator_id}")
+        else:
+            print(f"Reel Link not found in the database: {reel_link}")
     
     conn.commit()
     conn.close()
     
+    print("CSV Processing Completed Successfully!")
+    
     sync_to_google_sheets()  # Sync after uploading CSV
 
     return redirect(url_for('manager'))
+
 
 
 
