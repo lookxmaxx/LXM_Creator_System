@@ -275,50 +275,47 @@ def upload_csv():
     import pandas as pd
     csv_data = pd.read_csv(file)
     
-    # Convert all column names to lowercase to avoid case sensitivity issues
+    # Convert all column names to lowercase to make the code case-insensitive
     csv_data.columns = [col.strip().lower() for col in csv_data.columns]
 
     # Ensure only the necessary columns are considered
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
 
-    filtered_data = csv_data[['link', 'views']]
+    # Rename 'link' column to 'Reel Link' to match Google Sheets headers
+    csv_data.rename(columns={'link': 'reel link'}, inplace=True)
+
+    filtered_data = csv_data[['reel link', 'views']]
 
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
     for index, row in filtered_data.iterrows():
-        reel_link = row['link'].strip()  # Clean string to avoid issues
-        views = int(row['views'])  # Ensure views is treated as an integer
+        reel_link = row['reel link'].strip()  # Ensure clean string matching
+        views = int(row['views'])  # Convert views to integer
         
-        # Fetch submission ID and creator ID from the database
         cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
         result = cursor.fetchone()
         
         if result:
             creator_id, submission_id = result
-            
-            # Fetch CPM from the creators table
             cursor.execute("SELECT cpm FROM creators WHERE id = ?", (creator_id,))
             cpm_result = cursor.fetchone()
             
             if cpm_result:
                 cpm = cpm_result[0]
-                
-                # Calculate earnings
                 earnings = (views / 1000) * cpm
                 
-                # Update the submissions table with views and earnings
                 cursor.execute("UPDATE submissions SET views = ?, earnings = ? WHERE id = ?",
                                (views, earnings, submission_id))
     
     conn.commit()
     conn.close()
     
-    # Trigger Google Sheets sync AFTER updating the database
-    sync_to_google_sheets()
+    sync_to_google_sheets()  # Sync after uploading CSV
 
     return redirect(url_for('manager'))
+
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
