@@ -80,7 +80,7 @@ def determine_month_range(date_string):
     
     return f"{start_month_name} {start_date.year} - {end_month_name} {end_date.year}"
 
-def sync_to_google_sheets():  # Make sure this definition is correct
+def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
     
@@ -101,7 +101,7 @@ def sync_to_google_sheets():  # Make sure this definition is correct
     for row in all_submissions:
         submission_date = row[6]  # Date Submitted
         try:
-            month_range = determine_month_range(submission_date)  # Get the Month Range
+            month_range = determine_month_range(submission_date)
         except:
             month_range = "Invalid Date"
         
@@ -117,6 +117,7 @@ def sync_to_google_sheets():  # Make sure this definition is correct
             print(f"Failed to update Google Sheets: {e}")
 
     conn.close()
+
 
 def get_session_name(date_string):
     from datetime import datetime
@@ -205,25 +206,22 @@ def submit(creator_id):
         conn = sqlite3.connect('submissions.db')
         cursor = conn.cursor()
 
-        cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
-                       (reel_link, submission_time, creator_id))
-        conn.commit()
-        conn.close()
+        try:
+            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
+                           (reel_link, submission_time, creator_id))
+            conn.commit()
+            
+            # Properly call the sync function AFTER committing data
+            sync_to_google_sheets()
 
-        # Make sure this line is properly indented within the function
-        sync_to_google_sheets()  
-
-        return redirect(url_for('success', creator_id=creator_id))
-    return render_template('submit.html', creator_id=creator_id)
-
-            # Sync to Google Sheets
-            sync_to_google_sheets()  # Make sure this function is defined correctly
-
-            return redirect(url_for('success', creator_id=creator_id))  # Ensure success.html exists in your templates folder
+            return redirect(url_for('success', creator_id=creator_id))
         except Exception as e:
             print(f"Error during submission: {e}")
             return "Submission Failed. Please try again.", 500
+        finally:
+            conn.close()
     return render_template('submit.html', creator_id=creator_id)
+
 
 @app.route('/success/<creator_id>')
 def success(creator_id):
@@ -447,7 +445,7 @@ def update_submission():
         
         conn.commit()
         
-        # Trigger Google Sheets sync after updating the submission
+        # Properly call the sync function AFTER committing data
         sync_to_google_sheets()
         
     except sqlite3.Error as e:
