@@ -275,24 +275,22 @@ def upload_csv():
     import pandas as pd
     csv_data = pd.read_csv(file)
     
-    # Make all column names lowercase and remove extra spaces for consistency
+    # Convert all column names to lowercase for consistency
     csv_data.columns = [col.strip().lower() for col in csv_data.columns]
     
-    # Ensure the required columns are present
+    # Ensure the CSV file has the correct headers
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
+
+    # Rename the columns to match Google Sheets headers
+    csv_data.rename(columns={'link': 'Reel Link', 'views': 'Views'}, inplace=True)
     
-    # Rename CSV columns to match your Google Sheets headers
-    csv_data.rename(columns={'link': 'reel link', 'views': 'views'}, inplace=True)
-
-    filtered_data = csv_data[['reel link', 'views']]
-
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    for index, row in filtered_data.iterrows():
-        reel_link = row['reel link'].strip()  # Clean any unwanted spaces
-        views = int(row['views'])  # Convert views to integer
+    for index, row in csv_data.iterrows():
+        reel_link = row['Reel Link'].strip()  # Ensure clean string matching
+        views = int(row['Views'])  # Convert views to integer
         
         cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
         result = cursor.fetchone()
@@ -315,10 +313,6 @@ def upload_csv():
     sync_to_google_sheets()  # Sync after uploading CSV
 
     return redirect(url_for('manager'))
-
-
-
-
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
