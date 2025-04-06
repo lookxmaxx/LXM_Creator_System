@@ -116,7 +116,6 @@ def sync_to_google_sheets():
             month_range  # Add calculated Month Range here
         ])
     
-    # Append rows to Google Sheet
     if rows_to_add:
         try:
             sheet.insert_rows(rows_to_add, row=2)
@@ -275,23 +274,24 @@ def upload_csv():
     import pandas as pd
     csv_data = pd.read_csv(file)
     
-    # Convert all column names to lowercase to make the code case-insensitive
+    # Make all column names lowercase for easier matching
     csv_data.columns = [col.strip().lower() for col in csv_data.columns]
 
-    # Ensure only the necessary columns are considered
+    # Ensure the columns we need are present
     if 'link' not in csv_data.columns or 'views' not in csv_data.columns:
         return "CSV file must contain 'Link' and 'Views' columns"
-
-    # Rename 'link' column to 'Reel Link' to match Google Sheets headers
+    
+    # Rename 'link' column to match your Google Sheets header
     csv_data.rename(columns={'link': 'reel link'}, inplace=True)
 
+    # Keep only necessary columns
     filtered_data = csv_data[['reel link', 'views']]
 
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
     for index, row in filtered_data.iterrows():
-        reel_link = row['reel link'].strip()  # Ensure clean string matching
+        reel_link = row['reel link'].strip()  # Clean string for matching
         views = int(row['views'])  # Convert views to integer
         
         cursor.execute("SELECT creator_id, id FROM submissions WHERE reel_link = ?", (reel_link,))
@@ -312,7 +312,7 @@ def upload_csv():
     conn.commit()
     conn.close()
     
-    sync_to_google_sheets()  # Sync after uploading CSV
+    sync_to_google_sheets()  # Ensure Sheets sync after upload
 
     return redirect(url_for('manager'))
 
