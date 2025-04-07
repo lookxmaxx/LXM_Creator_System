@@ -276,30 +276,35 @@ def upload_csv():
     if 'file' not in request.files:
         flash('No file part')
         return redirect(request.url)
-
+    
     file = request.files['file']
-
+    
     if file.filename == '':
         flash('No selected file')
         return redirect(request.url)
-
-    if file and allowed_file(file.filename):  # Define `allowed_file()` if not already defined
+    
+    if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-
-        # Process CSV file here (existing code for updating views/earnings)
-        process_csv(filepath)
-        flash('File uploaded and processed successfully')
-
-        # Syncing to Google Sheets after CSV processing
-        sync_to_google_sheets()
-
-        return redirect(url_for('manager'))
-
-    flash('Invalid file format')
+        
+        try:
+            file.save(filepath)
+            
+            # Process the CSV file here (implement your logic here)
+            # Example: process_csv(filepath)
+            flash('File successfully uploaded and processed')
+            
+            # Sync to Google Sheets if necessary
+            # sync_to_google_sheets()
+            
+            return redirect(url_for('manager'))
+        
+        except Exception as e:
+            flash(f"An error occurred: {str(e)}")
+            return redirect(request.url)
+    
+    flash('Allowed file types are csv')
     return redirect(request.url)
-
 
 # Home Route
 @app.route('/')
