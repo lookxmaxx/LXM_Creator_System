@@ -12,17 +12,18 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from urllib.parse import urlparse, urlunparse
 import csv
+import logging
 
 app = Flask(__name__)
 CORS(app)
 
-app = Flask(__name__)
-CORS(app)
+logging.basicConfig(level=logging.INFO)
 
-UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # This ensures the uploads folder exists
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 
 # Allowed Extensions for CSV
 ALLOWED_EXTENSIONS = {'csv'}
@@ -40,7 +41,10 @@ PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
 
 
-
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    
 def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme='https', netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
@@ -219,7 +223,16 @@ def initialize_database():
 
 initialize_database()
 
+@app.errorhandler(500)
+def internal_error(error):
+    logging.error(f"Server Error: {error}, route: {request.url}")
+    return "Internal Server Error", 500
 
+@app.errorhandler(Exception)
+def unhandled_exception(e):
+    logging.error(f"Unhandled Exception: {e}, route: {request.url}")
+    return "Internal Server Error", 500
+    
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
@@ -246,7 +259,26 @@ def submit(creator_id):
             conn.close()
     return render_template('submit.html', creator_id=creator_id)
 
-    
+    @app.route('/upload_csv', methods=['POST'])
+def upload_csv():
+    if 'file' not in request.files:
+        flash('No file part')
+        return redirect(request.url)
+    file = request.files['file']
+    if file.filename == '':
+        flash('No selected file')
+        return redirect(request.url)
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        # Process the CSV file here
+        flash('File successfully uploaded')
+        return redirect(url_for('manager'))
+    else:
+        flash('Allowed file types are csv')
+        return redirect(request.url)
+        
 @app.route('/check_submission_dates')
 def check_submission_dates():
     conn = sqlite3.connect('submissions.db')
