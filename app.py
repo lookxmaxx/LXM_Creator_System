@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, flash, redirect, url_for, session
 import sqlite3
 from datetime import datetime
 import gspread
@@ -290,8 +290,8 @@ def upload_csv():
         try:
             file.save(filepath)
             
-            # Process the CSV file here (implement your logic here)
-            # Example: process_csv(filepath)
+            # Process the CSV file here
+            # process_csv(filepath)
             flash('File successfully uploaded and processed')
             
             # Sync to Google Sheets if necessary
