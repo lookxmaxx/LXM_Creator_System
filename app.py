@@ -251,6 +251,17 @@ def check_submission_dates():
     # Display results in a readable format
     return str(results)
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        if password == MANAGER_PASSWORD:  # Ensure you have this set in your `.env` file
+            session['logged_in'] = True
+            return redirect(url_for('manager'))
+        else:
+            return "Invalid password, try again.", 403
+    return render_template('login.html')
+    
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
     if 'csv_file' not in request.files:
