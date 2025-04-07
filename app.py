@@ -1,35 +1,43 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 import sqlite3
 from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
+from pushbullet import Pushbullet
 import os
-from flask_cors import CORS
-from urllib.parse import urlparse
-from dotenv import load_dotenv
+import io
+import pandas as pd
 from werkzeug.utils import secure_filename
-
-# Load environment variables from the .env file
-load_dotenv()
+from flask_cors import CORS
+from dotenv import load_dotenv
+from urllib.parse import urlparse
+import csv
 
 app = Flask(__name__)
 CORS(app)
 
+app = Flask(__name__)
+CORS(app)
 
+# Setup Upload Folder Path
+UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Allowed Extensions for CSV
 ALLOWED_EXTENSIONS = {'csv'}
-# Load secret key for sessions
+
+# Load environment variables
+load_dotenv()
 app.secret_key = os.getenv("SECRET_KEY")
-# Load manager password from environment variable
 MANAGER_PASSWORD = os.getenv("MANAGER_PASSWORD")
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
+
 # Load Pushbullet API Key from environment variable
 PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
-
-# Load Google Application Credentials Path
-credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if not credentials_path:
-    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS is not set in the environment variables.")
-
-# This line ensures your credentials file is accessible
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -88,51 +96,33 @@ def determine_month_range(date_string):
     return f"{start_month_name} {start_date.year} - {end_month_name} {end_date.year}"
 
 def sync_to_google_sheets():
-    sheet = connect_to_google_sheets()
-    all_data = sheet.get_all_values()
-    
-    # Clear existing data (except header)
-    if len(all_data) > 1:
-        sheet.delete_rows(2, len(all_data))
-    
-    conn = sqlite3.connect('submissions.db')
-    cursor = conn.cursor()
+    try:
+        sheet = connect_to_google_sheets()
+        all_data = sheet.get_all_values()
 
-    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
-                      submissions.creator_id, submissions.status, submissions.submission_time
-                      FROM submissions 
-                      JOIN creators ON submissions.creator_id = creators.id''')
-    all_submissions = cursor.fetchall()
-    
-    rows_to_add = []
-    for row in all_submissions:
-        submission_date = row[6]  # Date Submitted
-        try:
-            month_range = determine_month_range(submission_date)  # Get the Month Range
-        except:
-            month_range = "Invalid Date"
+        if len(all_data) > 1:
+            sheet.delete_rows(2, len(all_data))
         
-        rows_to_add.append([
-            row[0],  # Username
-            row[1],  # Reel Link
-            row[2],  # Views
-            row[3],  # Earnings
-            row[4],  # Creator ID
-            row[5],  # Status
-            row[6],  # Date Submitted
-            month_range  # Add calculated Month Range here
-        ])
-    
-    if rows_to_add:
-        try:
+        conn = sqlite3.connect('submissions.db')
+        cursor = conn.cursor()
+
+        cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
+                          submissions.creator_id, submissions.status, submissions.submission_time
+                          FROM submissions 
+                          JOIN creators ON submissions.creator_id = creators.id''')
+        all_submissions = cursor.fetchall()
+        
+        rows_to_add = []
+        for row in all_submissions:
+            rows_to_add.append(list(row))
+        
+        if rows_to_add:
             sheet.insert_rows(rows_to_add, row=2)
-            print("Google Sheets updated successfully with Month Range.")
-        except Exception as e:
-            print(f"Failed to update Google Sheets: {e}")
+            print("Google Sheets updated successfully.")
 
-    conn.close()
-
-
+        conn.close()
+    except Exception as e:
+        print(f"Error syncing with Google Sheets: {e}")
 
 def process_csv(file):
     conn = sqlite3.connect('submissions.db')
@@ -263,11 +253,6 @@ def submit(creator_id):
             conn.close()
     return render_template('submit.html', creator_id=creator_id)
 
-
-@app.route('/success/<creator_id>')
-def success(creator_id):
-    return render_template('success.html', creator_id=creator_id)
-
     
 @app.route('/check_submission_dates')
 def check_submission_dates():
@@ -294,24 +279,18 @@ def upload_csv():
         return "No selected file", 400
 
     if file and file.filename.endswith('.csv'):
-        try:
-            # Read the file directly in memory without saving to disk (Render can't save files)
-            csv_data = file.read().decode('utf-8')
-            csv_file = io.StringIO(csv_data)
-            
-            # Process the CSV data directly
-            process_csv(csv_file)
-            
-            # Sync Google Sheets (IMPORTANT 🔥🔥)
-            sync_to_google_sheets()
-            
-            return redirect(url_for('manager'))
-        except Exception as e:
-            print(f"Error processing CSV file: {e}")
-            return "Failed to process CSV file", 500
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+        file.save(file_path)
+        
+        # Process the CSV file
+        process_csv(file_path)
+        
+        # Sync Google Sheets (🔥 CRITICAL 🔥)
+        sync_to_google_sheets()
+
+        return redirect(url_for('manager'))
     
     return "Invalid file type", 400
-
 
 # Route for Adding Announcements
 @app.route('/add_announcement', methods=['POST'])
@@ -492,9 +471,9 @@ def add_creator():
     
     return redirect(url_for('manager'))  # Redirect back to the manager dashboard
 
-
-
-
+@app.route('/success/<creator_id>')
+def success(creator_id):
+    return render_template('success.html', creator_id=creator_id)
 
 if __name__ == "__main__":
     app.run(debug=True)
