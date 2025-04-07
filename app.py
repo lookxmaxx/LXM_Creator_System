@@ -176,24 +176,10 @@ def connect_to_google_sheets():
     sheet = client.open("LXM Creator Data").worksheet("Earnings")
     return sheet
 
-# Create Database
-def create_database():
+def initialize_database():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
-    # Submissions Table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS submissions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            reel_link TEXT NOT NULL,
-            submission_time TEXT NOT NULL,
-            status TEXT DEFAULT 'Pending',
-            rejection_reason TEXT DEFAULT '',
-            creator_id TEXT NOT NULL
-        )
-    ''')
-
-    # Creators Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS creators (
             id TEXT PRIMARY KEY,
@@ -204,28 +190,25 @@ def create_database():
         )
     ''')
 
-    # Announcements Table
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS announcements (
+        CREATE TABLE IF NOT EXISTS submissions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            message TEXT NOT NULL,
-            timestamp TEXT NOT NULL
-        )
-    ''')
-
-    # Notifications Table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            creator_id TEXT,
-            message TEXT,
-            timestamp TEXT,
+            reel_link TEXT NOT NULL,
+            submission_time TEXT NOT NULL,
+            status TEXT DEFAULT 'Pending',
+            rejection_reason TEXT DEFAULT '',
+            creator_id TEXT NOT NULL,
+            views INTEGER DEFAULT 0,
+            earnings REAL DEFAULT 0.0,
             FOREIGN KEY (creator_id) REFERENCES creators(id)
         )
     ''')
 
     conn.commit()
     conn.close()
+
+initialize_database()
+
 
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
