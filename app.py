@@ -262,32 +262,33 @@ def login():
             return "Invalid password, try again.", 403
     return render_template('login.html')
     
-@app.route('/upload_csv', methods=['POST'])
+@app.route('/upload_csv', methods=['GET', 'POST'])
 def upload_csv():
-    if 'csv_file' not in request.files:
-        return "No file part", 400
+    if request.method == 'POST':
+        if 'csv_file' not in request.files:
+            print("No file part found")
+            return "No file part", 400
 
-    file = request.files['csv_file']
+        file = request.files['csv_file']
+        
+        if file.filename == '':
+            print("No selected file")
+            return "No selected file", 400
+
+        if file and file.filename.endswith('.csv'):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+            file.save(file_path)
+            
+            # Process the CSV file
+            process_csv(file_path)
+            
+            # Sync Google Sheets (🔥 Important)
+            sync_to_google_sheets()
+            
+            return redirect(url_for('manager'))
     
-    if file.filename == '':
-        return "No selected file", 400
+    return render_template('upload_csv.html')  # This renders the upload form
 
-    if file and file.filename.endswith('.csv'):
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-        
-        if not os.path.exists(app.config['UPLOAD_FOLDER']):
-            os.makedirs(app.config['UPLOAD_FOLDER'])
-        
-        file.save(file_path)
-        
-        # Process the CSV file
-        process_csv(file_path)
-        
-        # Sync Google Sheets
-        sync_to_google_sheets()
-        
-        return redirect(url_for('manager'))
-    return "Invalid file type", 400
 
 # Route for Deleting a Creator (And All Their Data)
 @app.route('/delete_creator', methods=['POST'])
