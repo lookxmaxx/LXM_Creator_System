@@ -19,10 +19,10 @@ CORS(app)
 app = Flask(__name__)
 CORS(app)
 
-# Setup Upload Folder Path
 UPLOAD_FOLDER = os.path.join(app.root_path, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # This ensures the uploads folder exists
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 
 # Allowed Extensions for CSV
 ALLOWED_EXTENSIONS = {'csv'}
