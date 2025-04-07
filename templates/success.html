@@ -91,8 +91,8 @@
     <div class="success-container">
       <!-- success.html -->
 <h1>Submission Successful!</h1>
-<p>Your reel has been successfully submitted.</p>
-<a href="{{ url_for('submit', creator_id=creator_id) }}">Back to Submission Page</a>
+ <p>You can now go back to your dashboard, Creator ID: {{ creator_id }}</p>
+<a href="{{ url_for('submit', creator_id=creator_id) }}">Go back to Submit Page</a>
     </div>
 </body>
 </html>
