@@ -213,10 +213,11 @@
 
         <!-- Upload CSV Form -->
         <h2>Upload CSV</h2>
-  <form action="/upload_csv" method="POST" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".csv" required>
-    <button type="submit">Upload CSV</button>
+ <form action="{{ url_for('upload_csv') }}" method="POST" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv">
+    <input type="submit" value="Upload CSV">
 </form>
+
 
 
         <!-- Announcements Form -->
