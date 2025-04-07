@@ -279,35 +279,21 @@ def upload_csv():
         return "No selected file", 400
 
     if file and file.filename.endswith('.csv'):
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            os.makedirs(app.config['UPLOAD_FOLDER'])
+        
         file.save(file_path)
         
         # Process the CSV file
         process_csv(file_path)
         
-        # Sync Google Sheets (🔥 CRITICAL 🔥)
+        # Sync Google Sheets
         sync_to_google_sheets()
-
+        
         return redirect(url_for('manager'))
-    
     return "Invalid file type", 400
-
-# Route for Adding Announcements
-@app.route('/add_announcement', methods=['POST'])
-def add_announcement():
-    message = request.form['message']
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    conn = sqlite3.connect('submissions.db')
-    cursor = conn.cursor()
-
-    cursor.execute("INSERT INTO announcements (message, timestamp) VALUES (?, ?)", (message, timestamp))
-    
-    conn.commit()
-    conn.close()
-    
-    return redirect(url_for('manager'))
-
 
 # Route for Deleting a Creator (And All Their Data)
 @app.route('/delete_creator', methods=['POST'])
