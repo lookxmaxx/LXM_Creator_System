@@ -10,7 +10,7 @@ import pandas as pd
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from dotenv import load_dotenv
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 import csv
 
 app = Flask(__name__)
@@ -38,6 +38,16 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
 # Load Pushbullet API Key from environment variable
 PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
+
+
+
+def normalize_url(url):
+    parsed_url = urlparse(url)
+    normalized_url = parsed_url._replace(scheme='https', netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
+    return urlunparse(normalized_url)
+
+# Example usage before saving URLs
+# normalized_url = normalize_url(your_url)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -262,50 +272,34 @@ def login():
             return "Invalid password, try again.", 403
     return render_template('login.html')
     
-@app.route('/upload_csv', methods=['GET', 'POST'])
+@app.route('/upload_csv', methods=['POST'])
 def upload_csv():
-    if request.method == 'POST':
-        if 'csv_file' not in request.files:
-            print("No file part found")
-            return "No file part", 400
+    if 'file' not in request.files:
+        flash('No file part')
+        return redirect(request.url)
 
-        file = request.files['csv_file']
-        
-        if file.filename == '':
-            print("No selected file")
-            return "No selected file", 400
+    file = request.files['file']
 
-        if file and file.filename.endswith('.csv'):
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
-            file.save(file_path)
-            
-            # Process the CSV file
-            process_csv(file_path)
-            
-            # Sync Google Sheets (🔥 Important)
-            sync_to_google_sheets()
-            
-            return redirect(url_for('manager'))
-    
-    return render_template('upload_csv.html')  # This renders the upload form
+    if file.filename == '':
+        flash('No selected file')
+        return redirect(request.url)
 
+    if file and allowed_file(file.filename):  # Define `allowed_file()` if not already defined
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
 
-# Route for Deleting a Creator (And All Their Data)
-@app.route('/delete_creator', methods=['POST'])
-def delete_creator():
-    creator_id = request.form['creator_id']
-    
-    conn = sqlite3.connect('submissions.db')
-    cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
-    cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
-    conn.commit()
-    conn.close()
+        # Process CSV file here (existing code for updating views/earnings)
+        process_csv(filepath)
+        flash('File uploaded and processed successfully')
 
-    sync_to_google_sheets()  # Sync after deleting a creator
+        # Syncing to Google Sheets after CSV processing
+        sync_to_google_sheets()
 
-    return redirect(url_for('manager'))
+        return redirect(url_for('manager'))
+
+    flash('Invalid file format')
+    return redirect(request.url)
 
 
 # Home Route
