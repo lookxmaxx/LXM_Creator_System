@@ -260,45 +260,6 @@ def submit(creator_id):
     return render_template('submit.html', creator_id=creator_id)
 
 
-
-@app.route('/upload_csv', methods=['POST'])
-def upload_csv():
-    if 'file' not in request.files:
-        flash('No file part')
-        return redirect(request.url)
-    
-    file = request.files['file']
-    
-    if file.filename == '':
-        flash('No selected file')
-        return redirect(request.url)
-    
-    if file and allowed_file(file.filename):  # Check if the file is allowed
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
-        # Process the CSV file here
-        process_csv(filepath)
-        flash('File successfully uploaded')
-        
-        # Trigger sync to Google Sheets
-        sync_to_google_sheets()
-        
-        return redirect(url_for('manager'))
-    
-    flash('Allowed file types are csv')
-    return redirect(request.url)
-
-    # Run the query to get all submission dates
-    cursor.execute("SELECT submission_time FROM submissions;")
-    results = cursor.fetchall()
-    
-    conn.close()
-
-    # Display results in a readable format
-    return str(results)
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
