@@ -163,19 +163,14 @@
         </form>
 
         <!-- Submissions Table with Filters -->
-    <h2>Submissions</h2>
-
-<!-- Filter Buttons -->
-<a href="{{ url_for('manager', filter='All') }}">All</a> |
-<a href="{{ url_for('manager', filter='Pending') }}">Pending</a> |
-<a href="{{ url_for('manager', filter='Approved') }}">Approved</a> |
-<a href="{{ url_for('manager', filter='Rejected') }}">Rejected</a>
-
-<!-- Search Box -->
+<h2>Submissions</h2>
+<button onclick="filterTable('all')">All</button>
+<button onclick="filterTable('pending')">Pending</button>
+<button onclick="filterTable('approved')">Approved</button>
+<button onclick="filterTable('rejected')">Rejected</button>
 <input type="text" id="searchInput" onkeyup="searchTable()" placeholder="Search by Link">
 
-<!-- Submissions Table -->
-<table>
+<table id="submissionsTable">
     <thead>
         <tr>
             <th>Username</th>
@@ -187,29 +182,26 @@
     </thead>
     <tbody>
         {% for submission in submissions %}
-        <tr class="submission-row" data-status="{{ submission[3] | lower }}">
-            <td>{{ submission[7] }}</td>
+        <tr class="submission-row" data-status="{{ submission[5] | lower }}">
+            <td>{{ submission[0] }}</td>
             <td>{{ submission[1] }}</td>
             <td>{{ submission[2] }}</td>
-            <td>{{ submission[3] }}</td>
+            <td>{{ submission[5] }}</td>
             <td>
                 <div class="action-buttons">
-                    <!-- Approve Button -->
                     <form action="/update_submission" method="POST" style="display:inline;">
-                        <input type="hidden" name="submission_id" value="{{ submission[0] }}">
+                        <input type="hidden" name="submission_id" value="{{ submission[6] }}">
                         <button name="action" value="approve" class="action-button approve-button">Approve</button>
                     </form>
 
-                    <!-- Reject Button -->
                     <form action="/update_submission" method="POST" style="display:inline;">
-                        <input type="hidden" name="submission_id" value="{{ submission[0] }}">
-                        <input type="text" name="rejection_reason" placeholder="Reason" required>
+                        <input type="hidden" name="submission_id" value="{{ submission[6] }}">
+                        <input type="text" name="rejection_reason" placeholder="Reason">
                         <button name="action" value="reject" class="action-button reject-button">Reject</button>
                     </form>
 
-                    <!-- Re-Review Button -->
                     <form action="/update_submission" method="POST" style="display:inline;">
-                        <input type="hidden" name="submission_id" value="{{ submission[0] }}">
+                        <input type="hidden" name="submission_id" value="{{ submission[6] }}">
                         <button name="action" value="re-review" class="action-button rereview-button">Re-Review</button>
                     </form>
                 </div>
@@ -218,6 +210,39 @@
         {% endfor %}
     </tbody>
 </table>
+
+<script>
+    function filterTable(status) {
+        var rows = document.querySelectorAll(".submission-row");
+        rows.forEach(row => {
+            if (status === 'all' || row.getAttribute('data-status') === status) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    function searchTable() {
+        var input, filter, table, rows, td, i, txtValue;
+        input = document.getElementById("searchInput");
+        filter = input.value.toUpperCase();
+        table = document.getElementById("submissionsTable");
+        rows = table.getElementsByTagName("tr");
+
+        for (i = 1; i < rows.length; i++) {
+            td = rows[i].getElementsByTagName("td")[1];
+            if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }       
+        }
+    }
+</script>
 
 <!-- JavaScript for Search and Filtering -->
 <script>
