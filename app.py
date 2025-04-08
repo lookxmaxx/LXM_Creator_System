@@ -297,25 +297,36 @@ def unhandled_exception(e):
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
-        reel_link = request.form['reel_link']
+        reel_link = request.form.get('reel_link')
+        
+        # Make sure reel_link is not empty
+        if not reel_link or reel_link.strip() == '':
+            return "Reel link cannot be empty", 400
+        
         submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
 
-        conn = sqlite3.connect('submissions.db')
-        cursor = conn.cursor()
-
         try:
+            conn = sqlite3.connect('submissions.db')
+            cursor = conn.cursor()
+            
             cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
                            (reel_link, submission_time, creator_id))
             conn.commit()
             conn.close()
             
-            # Sync with Google Sheets
-            sync_to_google_sheets()
-
+            # Attempt to sync with Google Sheets, but don't crash if it fails
+            try:
+                sync_to_google_sheets()
+            except Exception as e:
+                print(f"Google Sheets Sync Error: {e}")
+            
             return redirect(url_for('success', creator_id=creator_id))
+        
         except Exception as e:
             print(f"Error during submission: {e}")
             return "Submission Failed. Please try again.", 500
+        
+    return render_template('submit.html', creator_id=creator_id)
             
 @app.route('/delete_creator', methods=['POST'])
 def delete_creator():
