@@ -114,65 +114,34 @@ def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
     
-    # Retrieve existing data
-    existing_data = {row[1]: row_index + 1 for row_index, row in enumerate(all_data[1:])}  # Start from index 1 to skip header
-
+    # Do not clear entire data - only overwrite updated rows
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
     cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
                       submissions.creator_id, submissions.status, submissions.submission_time
                       FROM submissions 
-                      JOIN creators ON submissions.creator_id = creators.id''')
+                      LEFT JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
     
     rows_to_add = []
-    rows_to_update = []
-    
     for row in all_submissions:
-        username, reel_link, views, earnings, creator_id, status, submission_date = row
-        
-        if reel_link in existing_data:
-            # Prepare the updated row with the new status, keeping Month Range intact
-            row_index = existing_data[reel_link]
-            rows_to_update.append({
-                "index": row_index,
-                "data": [
-                    username,
-                    reel_link,
-                    views,
-                    earnings,
-                    creator_id,
-                    status,
-                    submission_date,
-                    all_data[row_index][7]  # Keep the existing Month Range as it is
-                ]
-            })
-        else:
-            # Prepare new rows to be added
-            rows_to_add.append([
-                username,
-                reel_link,
-                views,
-                earnings,
-                creator_id,
-                status,
-                submission_date,
-                ""  # Leaving Month Range empty as requested
-            ])
+        rows_to_add.append([
+            row[0],  # Username
+            row[1],  # Reel Link
+            row[2],  # Views
+            row[3],  # Earnings
+            row[4],  # Creator ID
+            row[5],  # Status
+            row[6],  # Date Submitted
+        ])
     
-    try:
-        # Update existing rows (only status or other changes)
-        for row_to_update in rows_to_update:
-            sheet.update(f'A{row_to_update["index"] + 1}:H{row_to_update["index"] + 1}', [row_to_update["data"]])
-        
-        # Append new rows
-        if rows_to_add:
-            sheet.append_rows(rows_to_add)
-        
-        print("Google Sheets updated successfully.")
-    except Exception as e:
-        print(f"Failed to update Google Sheets: {e}")
+    if rows_to_add:
+        try:
+            sheet.insert_rows(rows_to_add, row=2)
+            print("Google Sheets updated successfully.")
+        except Exception as e:
+            print(f"Failed to update Google Sheets: {e}")
 
     conn.close()
 
@@ -228,10 +197,23 @@ def connect_to_google_sheets():
     sheet = client.open("LXM Creator Data").worksheet("Earnings")
     return sheet
 
-def initialize_database():
+def init_db():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
+    # Submissions Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reel_link TEXT NOT NULL,
+            submission_time TEXT NOT NULL,
+            status TEXT DEFAULT 'Pending',
+            rejection_reason TEXT DEFAULT '',
+            creator_id TEXT NOT NULL
+        )
+    ''')
+
+    # Creators Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS creators (
             id TEXT PRIMARY KEY,
@@ -242,24 +224,11 @@ def initialize_database():
         )
     ''')
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS submissions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            reel_link TEXT NOT NULL,
-            submission_time TEXT NOT NULL,
-            status TEXT DEFAULT 'Pending',
-            rejection_reason TEXT DEFAULT '',
-            creator_id TEXT NOT NULL,
-            views INTEGER DEFAULT 0,
-            earnings REAL DEFAULT 0.0,
-            FOREIGN KEY (creator_id) REFERENCES creators(id)
-        )
-    ''')
-
     conn.commit()
     conn.close()
 
-initialize_database()
+init_db()
+
 def sync_from_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()[1:]  # Skip the header row
@@ -485,26 +454,25 @@ def manager():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
+    # Ensure creators are being fetched correctly
     cursor.execute("SELECT id, username, cpm FROM creators")
     creators = cursor.fetchall()
 
-    filter_status = request.args.get('filter', 'All')  # Get the filter value from the URL parameters
-
-    if filter_status == "Pending":
-        cursor.execute("SELECT * FROM submissions WHERE status = 'Pending'")
-    elif filter_status == "Approved":
-        cursor.execute("SELECT * FROM submissions WHERE status = 'Approved'")
-    elif filter_status == "Rejected":
-        cursor.execute("SELECT * FROM submissions WHERE status = 'Rejected'")
-    else:  # Default to showing all submissions
-        cursor.execute("SELECT * FROM submissions")
-
+    # Check if creators were properly retrieved
+    if not creators:
+        print("No creators found in the database.")
+    
+    cursor.execute('''SELECT submissions.id, submissions.reel_link, submissions.submission_time, 
+                      submissions.status, submissions.rejection_reason, submissions.views, submissions.earnings, 
+                      creators.username, submissions.creator_id 
+                      FROM submissions 
+                      LEFT JOIN creators ON submissions.creator_id = creators.id''')
     submissions = cursor.fetchall()
     
     conn.close()
     
-    return render_template('manager.html', creators=creators, submissions=submissions, filter_status=filter_status)
-
+    return render_template('manager.html', creators=creators, submissions=submissions)
+    
 # Route for Updating CPM
 @app.route('/update_cpm', methods=['POST'])
 def update_cpm():
