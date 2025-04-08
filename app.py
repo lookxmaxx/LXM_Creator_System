@@ -41,16 +41,6 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
 PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
 
-import sqlite3
-
-conn = sqlite3.connect('submissions.db')
-cursor = conn.cursor()
-
-cursor.execute("DELETE FROM creators")
-cursor.execute("DELETE FROM submissions")
-conn.commit()
-conn.close()
-
 def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme='https', netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
@@ -137,15 +127,16 @@ def determine_month_range(date_string):
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     
+    # Define headers to be preserved
     headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
 
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
     cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
-                      submissions.creator_id, submissions.status, submissions.submission_time, submissions.id
+                      submissions.creator_id, submissions.status, submissions.submission_time
                       FROM submissions 
-                      JOIN creators ON submissions.creator_id = creators.id''')
+                      LEFT JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
     
     rows_to_add = []
@@ -164,14 +155,12 @@ def sync_to_google_sheets():
         try:
             existing_data = sheet.get_all_values()
             
-            # Only clear rows below the header
+            # Clear only data rows (leave headers intact)
             if len(existing_data) > 1:
                 sheet.delete_rows(2, len(existing_data))
             
-            # Insert headers and new data
-            sheet.insert_row(headers, 1)  # Insert headers
-            sheet.insert_rows(rows_to_add, row=2)  # Insert data below headers
-            
+            # Add rows below the headers
+            sheet.insert_rows(rows_to_add, row=2)
             print("Google Sheets updated successfully with Headers preserved.")
         except Exception as e:
             print(f"Failed to update Google Sheets: {e}")
@@ -308,7 +297,7 @@ def unhandled_exception(e):
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
-        reel_link = request.form.get('reel_link', None)
+        reel_link = request.form.get('reel_link')
         if not reel_link:
             return "No reel link provided", 400
 
@@ -318,20 +307,10 @@ def submit(creator_id):
         cursor = conn.cursor()
 
         try:
-            # Ensure the creator ID exists before proceeding
-            cursor.execute("SELECT * FROM creators WHERE id = ?", (creator_id,))
-            creator = cursor.fetchone()
-            if not creator:
-                return f"Creator with ID {creator_id} does not exist.", 400
-
-            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
-                           (reel_link, submission_time, creator_id))
+            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id, status) VALUES (?, ?, ?, ?)",
+                           (reel_link, submission_time, creator_id, 'Pending'))
             conn.commit()
-
-            # Sync to Google Sheets after commit
             sync_to_google_sheets()
-
-            # Render your success page
             return render_template('success.html', creator_id=creator_id)
         except Exception as e:
             conn.rollback()
