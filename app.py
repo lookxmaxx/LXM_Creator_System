@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from urllib.parse import urlparse, urlunparse
 import csv
 import logging
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -467,36 +468,45 @@ def update_submission():
 # Route for Adding New Creators
 @app.route('/add_creator', methods=['POST'])
 def add_creator():
+    import requests  # Make sure this import is present
+
+    creator_id = request.form.get('creator_id')
+    username = request.form.get('username')
+    cpm = request.form.get('cpm')
+
+    if not creator_id or not username or not cpm:
+        return "All fields are required.", 400
+
     try:
-        creator_id = request.form['creator_id']
-        username = request.form['username']
-        cpm = request.form.get('cpm')  # Changed from int() to handle potential empty inputs
+        cpm = int(cpm)
+    except ValueError:
+        return "Invalid CPM value. Must be a number.", 400
 
-        if not creator_id or not username or not cpm:
-            return "All fields are required (Creator ID, Username, CPM).", 400
-
-        try:
-            cpm = int(cpm)
-        except ValueError:
-            return "CPM must be a valid integer.", 400
-
-        conn = sqlite3.connect('submissions.db')
-        cursor = conn.cursor()
+    conn = sqlite3.connect('submissions.db')
+    cursor = conn.cursor()
+    
+    try:
+        submission_link = f"/submit/{creator_id}"
         
         # Generate the dashboard link by calling the Google Apps Script
         dashboard_link = generate_dashboard_link(creator_id)
         
-        cursor.execute("INSERT OR REPLACE INTO creators (id, username, cpm, dashboard_link) VALUES (?, ?, ?, ?)",
-                       (creator_id, username, cpm, dashboard_link))
+        cursor.execute('''
+            INSERT OR REPLACE INTO creators (id, username, cpm, dashboard_link) 
+            VALUES (?, ?, ?, ?)
+        ''', (creator_id, username, cpm, dashboard_link))
         
         conn.commit()
-        conn.close()
         
-        return redirect(url_for('manager'))
-    except Exception as e:
-        print(f"Error adding creator: {e}")
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Database error occurred: {e}")
         return "An error occurred while adding the creator. Please try again.", 500
-
+    
+    finally:
+        conn.close()
+    
+    return redirect(url_for('manager'))
 
 @app.route('/success/<creator_id>')
 def success(creator_id):
