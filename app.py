@@ -136,7 +136,6 @@ def determine_month_range(date_string):
 
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
-    all_data = sheet.get_all_values()
     
     headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
 
@@ -149,7 +148,7 @@ def sync_to_google_sheets():
                       JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
     
-    rows_to_add = [headers]  # Preserve Headers
+    rows_to_add = []
     for row in all_submissions:
         rows_to_add.append([
             row[0],  # Username
@@ -163,8 +162,16 @@ def sync_to_google_sheets():
     
     if rows_to_add:
         try:
-            sheet.clear()  # Clear the entire sheet before writing new data
-            sheet.insert_rows(rows_to_add, row=1)
+            existing_data = sheet.get_all_values()
+            
+            # Only clear rows below the header
+            if len(existing_data) > 1:
+                sheet.delete_rows(2, len(existing_data))
+            
+            # Insert headers and new data
+            sheet.insert_row(headers, 1)  # Insert headers
+            sheet.insert_rows(rows_to_add, row=2)  # Insert data below headers
+            
             print("Google Sheets updated successfully with Headers preserved.")
         except Exception as e:
             print(f"Failed to update Google Sheets: {e}")
@@ -539,7 +546,7 @@ def update_submission():
         
         conn.commit()
         
-        # Properly call the sync function AFTER committing data
+        # Call sync function AFTER committing data
         sync_to_google_sheets()
         
     except sqlite3.Error as e:
