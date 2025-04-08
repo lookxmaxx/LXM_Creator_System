@@ -268,16 +268,17 @@ def delete_creator():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-   cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
-   cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
-   conn.commit()
+    # Delete the creator from the database
+    cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
+    cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
+    
+    conn.commit()
     conn.close()
 
     # Sync with Google Sheets
     sync_to_google_sheets()
 
     return redirect(url_for('manager'))
-        
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
