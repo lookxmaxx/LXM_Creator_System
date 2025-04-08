@@ -113,38 +113,41 @@ def determine_month_range(date_string):
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
+
+    # Extract existing Reel Links to compare with
+    existing_links = {row[1] for row in all_data[1:] if len(row) > 1}  # Assuming row[1] is the Reel Link column
     
-    # Do not clear entire data - only overwrite updated rows
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
     cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
                       submissions.creator_id, submissions.status, submissions.submission_time
                       FROM submissions 
-                      LEFT JOIN creators ON submissions.creator_id = creators.id''')
+                      JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
     
     rows_to_add = []
     for row in all_submissions:
-        rows_to_add.append([
-            row[0],  # Username
-            row[1],  # Reel Link
-            row[2],  # Views
-            row[3],  # Earnings
-            row[4],  # Creator ID
-            row[5],  # Status
-            row[6],  # Date Submitted
-        ])
+        if row[1] not in existing_links:  # Only add if the link doesn't already exist
+            rows_to_add.append([
+                row[0],  # Username
+                row[1],  # Reel Link
+                row[2],  # Views
+                row[3],  # Earnings
+                row[4],  # Creator ID
+                row[5],  # Status
+                row[6]   # Date Submitted
+            ])
     
     if rows_to_add:
         try:
             sheet.insert_rows(rows_to_add, row=2)
-            print("Google Sheets updated successfully.")
+            print("Google Sheets updated successfully with new entries only.")
         except Exception as e:
             print(f"Failed to update Google Sheets: {e}")
 
     conn.close()
-
+    
 def process_csv(file):
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
