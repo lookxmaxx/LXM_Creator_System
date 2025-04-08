@@ -133,9 +133,6 @@ def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
     
-    # Extract existing Reel Links and their row indexes from the sheet
-    existing_links = {row[1]: index + 1 for index, row in enumerate(all_data[1:]) if len(row) > 1}
-
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
@@ -146,10 +143,8 @@ def sync_to_google_sheets():
     all_submissions = cursor.fetchall()
     
     rows_to_add = []
-    sheet_rows = []
-    
     for row in all_submissions:
-        submission_data = [
+        rows_to_add.append([
             row[0],  # Username
             row[1],  # Reel Link
             row[2],  # Views
@@ -157,17 +152,17 @@ def sync_to_google_sheets():
             row[4],  # Creator ID
             row[5],  # Status
             row[6],  # Date Submitted
-        ]
-        rows_to_add.append(submission_data)
-        sheet_rows.append(row[1])
-
-    # Clear the Google Sheets (except header) and re-upload all data
-    if len(all_data) > 1:
-        sheet.delete_rows(2, len(all_data))
-
+        ])
+    
     if rows_to_add:
         try:
+            # Preserve headers by only clearing data below them
+            if len(all_data) > 1:
+                sheet.delete_rows(2, len(all_data))  # This will clear everything from row 2 onwards, keeping the headers safe
+            
+            # Insert new rows below the headers
             sheet.insert_rows(rows_to_add, row=2)
+            
             print("Google Sheets updated successfully.")
         except Exception as e:
             print(f"Failed to update Google Sheets: {e}")
