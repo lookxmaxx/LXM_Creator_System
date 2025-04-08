@@ -40,7 +40,17 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
 # Load Pushbullet API Key from environment variable
 PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
-    
+
+import sqlite3
+
+conn = sqlite3.connect('submissions.db')
+cursor = conn.cursor()
+
+cursor.execute("DELETE FROM creators")
+cursor.execute("DELETE FROM submissions")
+conn.commit()
+conn.close()
+
 def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme='https', netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
@@ -128,22 +138,24 @@ def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
     
+    headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
+
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
     cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
-                      submissions.creator_id, submissions.status, submissions.submission_time
+                      submissions.creator_id, submissions.status, submissions.submission_time, submissions.id
                       FROM submissions 
                       JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
     
-    rows_to_add = []
+    rows_to_add = [headers]  # Preserve Headers
     for row in all_submissions:
         rows_to_add.append([
-            row[0] if row[0] else 'Unknown',  # Username
+            row[0],  # Username
             row[1],  # Reel Link
-            row[2] if row[2] else 0,  # Views
-            row[3] if row[3] else 0,  # Earnings
+            row[2],  # Views
+            row[3],  # Earnings
             row[4],  # Creator ID
             row[5],  # Status
             row[6],  # Date Submitted
@@ -151,11 +163,9 @@ def sync_to_google_sheets():
     
     if rows_to_add:
         try:
-            headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
-            sheet.clear()
-            sheet.insert_row(headers, 1)  # Insert headers if they are missing
-            sheet.insert_rows(rows_to_add, row=2)  # Add data starting from row 2 (keeping headers intact)
-            print("Google Sheets updated successfully.")
+            sheet.clear()  # Clear the entire sheet before writing new data
+            sheet.insert_rows(rows_to_add, row=1)
+            print("Google Sheets updated successfully with Headers preserved.")
         except Exception as e:
             print(f"Failed to update Google Sheets: {e}")
 
@@ -217,14 +227,7 @@ def create_database():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS creators (
-            id TEXT PRIMARY KEY,
-            username TEXT NOT NULL,
-            cpm INTEGER NOT NULL
-        )
-    ''')
-
+    # Submissions Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS submissions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -232,8 +235,18 @@ def create_database():
             submission_time TEXT NOT NULL,
             status TEXT DEFAULT 'Pending',
             rejection_reason TEXT DEFAULT '',
-            creator_id TEXT NOT NULL,
-            FOREIGN KEY (creator_id) REFERENCES creators(id)
+            creator_id TEXT NOT NULL
+        )
+    ''')
+
+    # Creators Table (Don't overwrite existing entries)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS creators (
+            id TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            cpm INTEGER NOT NULL,
+            email TEXT,
+            dashboard_link TEXT
         )
     ''')
 
@@ -526,7 +539,7 @@ def update_submission():
         
         conn.commit()
         
-        # Sync with Google Sheets
+        # Properly call the sync function AFTER committing data
         sync_to_google_sheets()
         
     except sqlite3.Error as e:
@@ -536,7 +549,7 @@ def update_submission():
         conn.close()
 
     return redirect(url_for('manager'))
-
+    
 # Route for Adding New Creators
 @app.route('/add_creator', methods=['POST'])
 def add_creator():
