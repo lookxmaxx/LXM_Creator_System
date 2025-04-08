@@ -326,7 +326,43 @@ def submit(creator_id):
             conn.close()
     return render_template('submit.html', creator_id=creator_id)
 
+@app.route('/delete_creator', methods=['POST'])
+def delete_creator():
+    try:
+        creator_id = request.form.get('creator_id')
+        
+        if not creator_id:
+            return "Creator ID is missing.", 400  # Bad request if no creator ID is provided
 
+        conn = sqlite3.connect('submissions.db')
+        cursor = conn.cursor()
+
+        # Check if the creator exists before deleting
+        cursor.execute("SELECT id FROM creators WHERE id = ?", (creator_id,))
+        result = cursor.fetchone()
+        
+        if result is None:
+            conn.close()
+            return "Creator not found.", 404  # Creator doesn't exist
+
+        # Delete the creator and their submissions
+        cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
+        cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
+        conn.commit()
+        conn.close()
+
+        try:
+            # Attempt to sync Google Sheets
+            sync_to_google_sheets()
+        except Exception as e:
+            print(f"Google Sheets sync failed: {e}")
+        
+        return redirect(url_for('manager'))
+
+    except Exception as e:
+        print(f"Error deleting creator: {e}")
+        return "An error occurred while deleting the creator.", 500
+        
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
