@@ -113,10 +113,10 @@ def determine_month_range(date_string):
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
-
-    # Extract existing Reel Links to compare with
-    existing_links = {row[1] for row in all_data[1:] if len(row) > 1}  # Assuming row[1] is the Reel Link column
     
+    # Extract existing Reel Links and their row indexes from the sheet
+    existing_links = {row[1]: index + 1 for index, row in enumerate(all_data[1:]) if len(row) > 1}
+
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
@@ -127,22 +127,29 @@ def sync_to_google_sheets():
     all_submissions = cursor.fetchall()
     
     rows_to_add = []
-    for row in all_submissions:
-        if row[1] not in existing_links:  # Only add if the link doesn't already exist
-            rows_to_add.append([
-                row[0],  # Username
-                row[1],  # Reel Link
-                row[2],  # Views
-                row[3],  # Earnings
-                row[4],  # Creator ID
-                row[5],  # Status
-                row[6]   # Date Submitted
-            ])
+    sheet_rows = []
     
+    for row in all_submissions:
+        submission_data = [
+            row[0],  # Username
+            row[1],  # Reel Link
+            row[2],  # Views
+            row[3],  # Earnings
+            row[4],  # Creator ID
+            row[5],  # Status
+            row[6],  # Date Submitted
+        ]
+        rows_to_add.append(submission_data)
+        sheet_rows.append(row[1])
+
+    # Clear the Google Sheets (except header) and re-upload all data
+    if len(all_data) > 1:
+        sheet.delete_rows(2, len(all_data))
+
     if rows_to_add:
         try:
             sheet.insert_rows(rows_to_add, row=2)
-            print("Google Sheets updated successfully with new entries only.")
+            print("Google Sheets updated successfully.")
         except Exception as e:
             print(f"Failed to update Google Sheets: {e}")
 
@@ -313,43 +320,29 @@ def submit(creator_id):
         finally:
             conn.close()
     return render_template('submit.html', creator_id=creator_id)
-
 @app.route('/delete_creator', methods=['POST'])
 def delete_creator():
+    creator_id = request.form['creator_id']
+    
+    conn = sqlite3.connect('submissions.db')
+    cursor = conn.cursor()
+    
     try:
-        creator_id = request.form.get('creator_id')
-        
-        if not creator_id:
-            return "Creator ID is missing.", 400  # Bad request if no creator ID is provided
-
-        conn = sqlite3.connect('submissions.db')
-        cursor = conn.cursor()
-
-        # Check if the creator exists before deleting
-        cursor.execute("SELECT id FROM creators WHERE id = ?", (creator_id,))
-        result = cursor.fetchone()
-        
-        if result is None:
-            conn.close()
-            return "Creator not found.", 404  # Creator doesn't exist
-
-        # Delete the creator and their submissions
+        # Delete the creator from the local database
         cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
         cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
         conn.commit()
-        conn.close()
-
-        try:
-            # Attempt to sync Google Sheets
-            sync_to_google_sheets()
-        except Exception as e:
-            print(f"Google Sheets sync failed: {e}")
         
-        return redirect(url_for('manager'))
-
+        # Sync Google Sheets to ensure deletion
+        sync_to_google_sheets()  # Trigger sync after deletion
+        
     except Exception as e:
         print(f"Error deleting creator: {e}")
-        return "An error occurred while deleting the creator.", 500
+        return "Error deleting creator", 500
+    finally:
+        conn.close()
+
+    return redirect(url_for('manager'))
         
 @app.route('/login', methods=['GET', 'POST'])
 def login():
