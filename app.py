@@ -41,7 +41,21 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
 PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
 
+def clear_all_data():
+    conn = sqlite3.connect('submissions.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("DELETE FROM creators")
+        cursor.execute("DELETE FROM submissions")
+        conn.commit()
+        print("All data cleared successfully.")
+    except Exception as e:
+        print(f"Error clearing all data: {e}")
+    finally:
+        conn.close()
 
+clear_all_data()
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -60,7 +74,18 @@ def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme="https", netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
     return normalized_url.geturl()
+
+def reset_google_sheet():
+    sheet = connect_to_google_sheets()
     
+    try:
+        headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
+        sheet.clear()  # Clears all data from the sheet
+        sheet.insert_row(headers, 1)  # Adds the headers back
+        print("Google Sheet reset successfully.")
+    except Exception as e:
+        print(f"Error resetting Google Sheet: {e}")
+        
 def generate_dashboard_link(creator_id):
     script_url = "https://script.google.com/macros/s/AKfycbwJ775U48Q2EwS3g7TabdVPS1mzM6s3f8NVPazj7PZY1lIw08QwiN9ZZNuOuHca-xSHSw/exec"  # Replace with your deployed Google Apps Script URL
     params = {'creatorId': creator_id}
