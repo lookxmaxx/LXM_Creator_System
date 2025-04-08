@@ -385,16 +385,22 @@ def manager():
     cursor.execute("SELECT id, username, cpm FROM creators")
     creators = cursor.fetchall()
 
-    cursor.execute('''SELECT submissions.id, submissions.reel_link, submissions.submission_time, 
-                      submissions.status, submissions.rejection_reason, submissions.views, submissions.earnings, 
-                      creators.username, submissions.creator_id 
-                      FROM submissions 
-                      JOIN creators ON submissions.creator_id = creators.id''')
+    filter_status = request.args.get('filter', 'All')  # Get the filter value from the URL parameters
+
+    if filter_status == "Pending":
+        cursor.execute("SELECT * FROM submissions WHERE status = 'Pending'")
+    elif filter_status == "Approved":
+        cursor.execute("SELECT * FROM submissions WHERE status = 'Approved'")
+    elif filter_status == "Rejected":
+        cursor.execute("SELECT * FROM submissions WHERE status = 'Rejected'")
+    else:  # Default to showing all submissions
+        cursor.execute("SELECT * FROM submissions")
+
     submissions = cursor.fetchall()
     
     conn.close()
     
-    return render_template('manager.html', creators=creators, submissions=submissions)
+    return render_template('manager.html', creators=creators, submissions=submissions, filter_status=filter_status)
 
 # Route for Updating CPM
 @app.route('/update_cpm', methods=['POST'])
@@ -461,27 +467,36 @@ def update_submission():
 # Route for Adding New Creators
 @app.route('/add_creator', methods=['POST'])
 def add_creator():
-    creator_id = request.form['creator_id']
-    username = request.form['username']
-    cpm = int(request.form['cpm'])
-    
-    conn = sqlite3.connect('submissions.db')
-    cursor = conn.cursor()
-    
-    # Generate the submission link
-    submission_link = f"/submit/{creator_id}"
-    
-    # Generate the dashboard link by calling the Google Apps Script
-    dashboard_link = generate_dashboard_link(creator_id)  # We'll define this function below
-    
-    # Insert new creator into the database, including the dashboard link
-    cursor.execute("INSERT OR REPLACE INTO creators (id, username, cpm, dashboard_link) VALUES (?, ?, ?, ?)",
-                   (creator_id, username, cpm, dashboard_link))
-    
-    conn.commit()
-    conn.close()
-    
-    return redirect(url_for('manager'))  # Redirect back to the manager dashboard
+    try:
+        creator_id = request.form['creator_id']
+        username = request.form['username']
+        cpm = request.form.get('cpm')  # Changed from int() to handle potential empty inputs
+
+        if not creator_id or not username or not cpm:
+            return "All fields are required (Creator ID, Username, CPM).", 400
+
+        try:
+            cpm = int(cpm)
+        except ValueError:
+            return "CPM must be a valid integer.", 400
+
+        conn = sqlite3.connect('submissions.db')
+        cursor = conn.cursor()
+        
+        # Generate the dashboard link by calling the Google Apps Script
+        dashboard_link = generate_dashboard_link(creator_id)
+        
+        cursor.execute("INSERT OR REPLACE INTO creators (id, username, cpm, dashboard_link) VALUES (?, ?, ?, ?)",
+                       (creator_id, username, cpm, dashboard_link))
+        
+        conn.commit()
+        conn.close()
+        
+        return redirect(url_for('manager'))
+    except Exception as e:
+        print(f"Error adding creator: {e}")
+        return "An error occurred while adding the creator. Please try again.", 500
+
 
 @app.route('/success/<creator_id>')
 def success(creator_id):
