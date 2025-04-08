@@ -15,7 +15,7 @@ import csv
 import logging
 import requests
 
-app = Flask(_name_)
+app = Flask(__name__)
 CORS(app)
 
 logging.basicConfig(level=logging.INFO)
