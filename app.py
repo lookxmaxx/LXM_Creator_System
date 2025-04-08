@@ -313,6 +313,39 @@ def home():
 
 
 
+@app.route('/update_earnings', methods=['GET', 'POST'])
+def update_earnings():
+    if request.method == 'POST':
+        username = request.form['username']
+        views = int(request.form['views'])
+        reel_link = request.form['reel_link']
+        
+        # Connect to Google Sheets
+        sheet = connect_to_google_sheets()
+        creators_sheet = sheet.worksheet('Creators')
+        earnings_sheet = sheet.worksheet('Earnings')
+
+        # Fetch CPM for the given username
+        creators_data = creators_sheet.get_all_values()
+        cpm = None
+
+        for row in creators_data[1:]:  # Skip the header row
+            if row[0].strip().lower() == username.strip().lower():
+                cpm = int(row[1])
+                break
+
+        if cpm is None:
+            return "CPM not found for the provided username.", 400
+
+        # Calculate earnings
+        earnings = (views / 1000) * cpm
+
+        # Update the Earnings Sheet
+        earnings_sheet.append_row([username, reel_link, views, earnings, 'Approved', datetime.now().strftime("%Y-%m-%d %I:%M %p")])
+        
+        return redirect(url_for('manager'))
+
+    return render_template('update_earnings.html')
 
 # Success Page Route
 
