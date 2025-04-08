@@ -132,42 +132,38 @@ def determine_month_range(date_string):
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
-    
+
+    # Ensure headers are present; if not, add them
+    headers = ['Username', 'Reel Link', 'Views', 'Earnings', 'Creator ID', 'Status', 'Date Submitted']
+    if not all_data or all_data[0] != headers:
+        sheet.insert_row(headers, 1)
+        all_data = [headers] + all_data
+
+    # Clear existing data below headers
+    if len(all_data) > 1:
+        sheet.delete_rows(2, len(all_data))
+
+    # Fetch data from the local database
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
-
-    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
-                      submissions.creator_id, submissions.status, submissions.submission_time
-                      FROM submissions 
-                      JOIN creators ON submissions.creator_id = creators.id''')
+    cursor.execute('''
+        SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings,
+               submissions.creator_id, submissions.status, submissions.submission_time
+        FROM submissions
+        JOIN creators ON submissions.creator_id = creators.id
+    ''')
     all_submissions = cursor.fetchall()
-    
-    rows_to_add = []
-    for row in all_submissions:
-        rows_to_add.append([
-            row[0],  # Username
-            row[1],  # Reel Link
-            row[2],  # Views
-            row[3],  # Earnings
-            row[4],  # Creator ID
-            row[5],  # Status
-            row[6],  # Date Submitted
-        ])
-    
-    if rows_to_add:
-        try:
-            # Preserve headers by only clearing data below them
-            if len(all_data) > 1:
-                sheet.delete_rows(2, len(all_data))  # This will clear everything from row 2 onwards, keeping the headers safe
-            
-            # Insert new rows below the headers
-            sheet.insert_rows(rows_to_add, row=2)
-            
-            print("Google Sheets updated successfully.")
-        except Exception as e:
-            print(f"Failed to update Google Sheets: {e}")
-
     conn.close()
+
+    # Prepare data for insertion
+    rows_to_add = [list(row) for row in all_submissions]
+
+    # Insert new data starting from the second row
+    if rows_to_add:
+        sheet.insert_rows(rows_to_add, 2)
+        print("Google Sheets updated successfully.")
+    else:
+        print("No new data to sync.")
     
 def process_csv(file):
     conn = sqlite3.connect('submissions.db')
@@ -311,18 +307,16 @@ def submit(creator_id):
             cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
                            (reel_link, submission_time, creator_id))
             conn.commit()
+            conn.close()
             
-            # Properly call the sync function AFTER committing data
+            # Sync with Google Sheets
             sync_to_google_sheets()
 
-            # Render your enhanced success page instead of returning plain text
-            return render_template('success.html', creator_id=creator_id)
+            return redirect(url_for('success', creator_id=creator_id))
         except Exception as e:
             print(f"Error during submission: {e}")
             return "Submission Failed. Please try again.", 500
-        finally:
-            conn.close()
-    return render_template('submit.html', creator_id=creator_id)
+            
 @app.route('/delete_creator', methods=['POST'])
 def delete_creator():
     creator_id = request.form['creator_id']
@@ -334,8 +328,9 @@ def delete_creator():
     cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
     conn.commit()
     conn.close()
-    
-    sync_to_google_sheets()  # Ensure the sync happens here
+
+    # Sync with Google Sheets
+    sync_to_google_sheets()
 
     return redirect(url_for('manager'))
         
@@ -526,7 +521,7 @@ def update_submission():
         
         conn.commit()
         
-        # Properly call the sync function AFTER committing data
+        # Sync with Google Sheets
         sync_to_google_sheets()
         
     except sqlite3.Error as e:
@@ -537,51 +532,31 @@ def update_submission():
 
     return redirect(url_for('manager'))
 
-
-
-
-
-
 # Route for Adding New Creators
 @app.route('/add_creator', methods=['POST'])
 def add_creator():
-    import requests  # Make sure this import is present
-
-    creator_id = request.form.get('creator_id')
-    username = request.form.get('username')
-    cpm = request.form.get('cpm')
-
-    if not creator_id or not username or not cpm:
-        return "All fields are required.", 400
-
-    try:
-        cpm = int(cpm)
-    except ValueError:
-        return "Invalid CPM value. Must be a number.", 400
-
+    creator_id = request.form['creator_id']
+    username = request.form['username']
+    cpm = int(request.form['cpm'])
+    
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    try:
-        submission_link = f"/submit/{creator_id}"
-        
-        # Generate the dashboard link by calling the Google Apps Script
-        dashboard_link = generate_dashboard_link(creator_id)
-        
-        cursor.execute('''
-            INSERT OR REPLACE INTO creators (id, username, cpm, dashboard_link) 
-            VALUES (?, ?, ?, ?)
-        ''', (creator_id, username, cpm, dashboard_link))
-        
-        conn.commit()
-        
-    except sqlite3.Error as e:
-        conn.rollback()
-        print(f"Database error occurred: {e}")
-        return "An error occurred while adding the creator. Please try again.", 500
+    # Generate the submission link
+    submission_link = f"/submit/{creator_id}"
     
-    finally:
-        conn.close()
+    # Generate the dashboard link by calling the Google Apps Script
+    dashboard_link = generate_dashboard_link(creator_id)
+    
+    # Insert new creator into the database, including the dashboard link
+    cursor.execute("INSERT OR REPLACE INTO creators (id, username, cpm, dashboard_link) VALUES (?, ?, ?, ?)",
+                   (creator_id, username, cpm, dashboard_link))
+    
+    conn.commit()
+    conn.close()
+    
+    # Add this line to sync with Google Sheets
+    sync_to_google_sheets()
     
     return redirect(url_for('manager'))
 
