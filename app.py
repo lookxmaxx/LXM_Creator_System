@@ -72,7 +72,26 @@ def generate_dashboard_link(creator_id):
     else:
         print("Failed to generate link:", response.status_code, response.text)
         return "Error Generating Link"
+        
+def delete_from_google_sheets(username_to_delete):
+    sheet = connect_to_google_sheets()
+    all_data = sheet.get_all_values()
 
+    # Find rows to delete by matching the username
+    rows_to_delete = []
+    for index, row in enumerate(all_data[1:], start=2):  # Start from 2 to avoid deleting the header row
+        if len(row) > 0 and row[0] == username_to_delete:
+            rows_to_delete.append(index)
+
+    # Delete rows in reverse order to avoid shifting row indexes during deletion
+    for row_index in reversed(rows_to_delete):
+        try:
+            sheet.delete_rows(row_index)
+        except Exception as e:
+            print(f"Failed to delete row {row_index} from Google Sheets: {e}")
+
+    print(f"Successfully removed all rows for user: {username_to_delete}")
+    
 from datetime import datetime
 
 def determine_month_range(date_string):
@@ -328,13 +347,21 @@ def delete_creator():
     cursor = conn.cursor()
     
     try:
+        # Get the username of the creator being deleted (for Google Sheets filtering)
+        cursor.execute("SELECT username FROM creators WHERE id = ?", (creator_id,))
+        creator_row = cursor.fetchone()
+        if not creator_row:
+            return "Creator not found", 404
+        
+        username_to_delete = creator_row[0]
+
         # Delete the creator from the local database
         cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
         cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
         conn.commit()
         
-        # Sync Google Sheets to ensure deletion
-        sync_to_google_sheets()  # Trigger sync after deletion
+        # Sync to Google Sheets to remove the creator's submissions
+        delete_from_google_sheets(username_to_delete)
         
     except Exception as e:
         print(f"Error deleting creator: {e}")
