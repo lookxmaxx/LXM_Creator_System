@@ -60,7 +60,7 @@ def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme="https", netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
     return normalized_url.geturl()
-
+    
 def generate_dashboard_link(creator_id):
     script_url = "https://script.google.com/macros/s/AKfycbwJ775U48Q2EwS3g7TabdVPS1mzM6s3f8NVPazj7PZY1lIw08QwiN9ZZNuOuHca-xSHSw/exec"  # Replace with your deployed Google Apps Script URL
     params = {'creatorId': creator_id}
@@ -260,7 +260,36 @@ def initialize_database():
     conn.close()
 
 initialize_database()
+def sync_from_google_sheets():
+    sheet = connect_to_google_sheets()
+    all_data = sheet.get_all_values()[1:]  # Skip the header row
+    
+    conn = sqlite3.connect('submissions.db')
+    cursor = conn.cursor()
+    
+    # Fetch existing creators from the database
+    cursor.execute("SELECT id FROM creators")
+    existing_creators = {row[0] for row in cursor.fetchall()}
 
+    for row in all_data:
+        try:
+            username, reel_link, views, earnings, creator_id, status, submission_time, month_range = row
+            
+            # If the creator is not in the database, add them
+            if creator_id not in existing_creators:
+                cursor.execute('''INSERT OR IGNORE INTO creators (id, username, cpm) 
+                                  VALUES (?, ?, ?)''', (creator_id, username, 0))  # Default CPM is set to 0
+                
+                # Also, add submissions from Google Sheets that are not in the database
+                cursor.execute('''INSERT OR IGNORE INTO submissions (reel_link, submission_time, creator_id, status) 
+                                  VALUES (?, ?, ?, ?)''', (reel_link, submission_time, creator_id, status))
+            
+        except Exception as e:
+            print(f"Error syncing from Google Sheets: {e}")
+    
+    conn.commit()
+    conn.close()
+    
 @app.errorhandler(500)
 def internal_error(error):
     logging.error(f"Server Error: {error}, route: {request.url}")
