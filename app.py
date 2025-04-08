@@ -261,10 +261,7 @@ init_db()
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
-
-    # Extract existing Reel Links and their row indexes from the sheet
-    existing_links = {row[1]: index + 1 for index, row in enumerate(all_data[1:]) if len(row) > 1}  # Reel Link is in column 2
-
+    
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
@@ -274,12 +271,9 @@ def sync_to_google_sheets():
                       JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
     
-    rows_to_update = []
     rows_to_add = []
-    
     for row in all_submissions:
-        reel_link = row[1]
-        submission_data = [
+        rows_to_add.append([
             row[0],  # Username
             row[1],  # Reel Link
             row[2],  # Views
@@ -287,18 +281,13 @@ def sync_to_google_sheets():
             row[4],  # Creator ID
             row[5],  # Status
             row[6],  # Date Submitted
-        ]
-        
-        if reel_link in existing_links:
-            row_index = existing_links[reel_link]
-            sheet.update(f'A{row_index + 1}:G{row_index + 1}', [submission_data])  # Updating existing row
-        else:
-            rows_to_add.append(submission_data)  # Adding new rows only if they don't already exist
+        ])
     
     if rows_to_add:
         try:
+            sheet.clear()  # Clear the entire sheet before writing new data
             sheet.insert_rows(rows_to_add, row=2)
-            print("Google Sheets updated successfully with new entries only.")
+            print("Google Sheets updated successfully.")
         except Exception as e:
             print(f"Failed to update Google Sheets: {e}")
 
@@ -346,28 +335,12 @@ def delete_creator():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    try:
-        # Get the username of the creator being deleted (for Google Sheets filtering)
-        cursor.execute("SELECT username FROM creators WHERE id = ?", (creator_id,))
-        creator_row = cursor.fetchone()
-        if not creator_row:
-            return "Creator not found", 404
-        
-        username_to_delete = creator_row[0]
-
-        # Delete the creator from the local database
-        cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
-        cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
-        conn.commit()
-        
-        # Sync to Google Sheets to remove the creator's submissions
-        delete_from_google_sheets(username_to_delete)
-        
-    except Exception as e:
-        print(f"Error deleting creator: {e}")
-        return "Error deleting creator", 500
-    finally:
-        conn.close()
+    cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
+    cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
+    conn.commit()
+    conn.close()
+    
+    sync_to_google_sheets()  # Ensure the sync happens here
 
     return redirect(url_for('manager'))
         
