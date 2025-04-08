@@ -40,25 +40,6 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
 # Load Pushbullet API Key from environment variable
 PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
 pb = Pushbullet(PUSHBULLET_API_KEY)
-
-def clear_all_data():
-    conn = sqlite3.connect('submissions.db')
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute("DELETE FROM creators")
-        cursor.execute("DELETE FROM submissions")
-        conn.commit()
-        print("All data cleared successfully.")
-    except Exception as e:
-        print(f"Error clearing all data: {e}")
-    finally:
-        conn.close()
-
-clear_all_data()
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
     
 def normalize_url(url):
     parsed_url = urlparse(url)
@@ -74,18 +55,7 @@ def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme="https", netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
     return normalized_url.geturl()
-
-def reset_google_sheet():
-    sheet = connect_to_google_sheets()
     
-    try:
-        headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
-        sheet.clear()  # Clears all data from the sheet
-        sheet.insert_row(headers, 1)  # Adds the headers back
-        print("Google Sheet reset successfully.")
-    except Exception as e:
-        print(f"Error resetting Google Sheet: {e}")
-        
 def generate_dashboard_link(creator_id):
     script_url = "https://script.google.com/macros/s/AKfycbwJ775U48Q2EwS3g7TabdVPS1mzM6s3f8NVPazj7PZY1lIw08QwiN9ZZNuOuHca-xSHSw/exec"  # Replace with your deployed Google Apps Script URL
     params = {'creatorId': creator_id}
@@ -318,39 +288,39 @@ def unhandled_exception(e):
 @app.route('/submit/<creator_id>', methods=['GET', 'POST'])
 def submit(creator_id):
     if request.method == 'POST':
-        reel_link = request.form.get('reel_link')
+        reel_link = request.form.get('reel_link', None)
         if not reel_link:
-            return "Reel link cannot be empty", 400
+            return "No reel link provided", 400
 
         submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
 
+        conn = sqlite3.connect('submissions.db')
+        cursor = conn.cursor()
+
         try:
-            conn = sqlite3.connect('submissions.db')
-            cursor = conn.cursor()
-            
-            # Check if creator exists
-            cursor.execute("SELECT username FROM creators WHERE id = ?", (creator_id,))
-            creator_row = cursor.fetchone()
-            
-            if not creator_row:
-                return "Creator not found. Please try again.", 400
+            # Ensure the creator ID exists before proceeding
+            cursor.execute("SELECT * FROM creators WHERE id = ?", (creator_id,))
+            creator = cursor.fetchone()
+            if not creator:
+                return f"Creator with ID {creator_id} does not exist.", 400
 
             cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
                            (reel_link, submission_time, creator_id))
             conn.commit()
-            
-            try:
-                sync_to_google_sheets()
-            except Exception as e:
-                print(f"Google Sheets Sync Error: {e}")
-            
-            return redirect(url_for('success', creator_id=creator_id))
-        
+
+            # Sync to Google Sheets after commit
+            sync_to_google_sheets()
+
+            # Render your success page
+            return render_template('success.html', creator_id=creator_id)
         except Exception as e:
+            conn.rollback()
             print(f"Error during submission: {e}")
-            return "Submission Failed. Please try again.", 500
+            return f"Internal Server Error: {e}", 500
         finally:
             conn.close()
+
+    return render_template('submit.html', creator_id=creator_id)
             
 @app.route('/delete_creator', methods=['POST'])
 def delete_creator():
