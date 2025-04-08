@@ -132,38 +132,39 @@ def determine_month_range(date_string):
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
-
-    # Ensure headers are present; if not, add them
-    headers = ['Username', 'Reel Link', 'Views', 'Earnings', 'Creator ID', 'Status', 'Date Submitted']
-    if not all_data or all_data[0] != headers:
-        sheet.insert_row(headers, 1)
-        all_data = [headers] + all_data
-
-    # Clear existing data below headers
-    if len(all_data) > 1:
-        sheet.delete_rows(2, len(all_data))
-
-    # Fetch data from the local database
+    
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
-    cursor.execute('''
-        SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings,
-               submissions.creator_id, submissions.status, submissions.submission_time
-        FROM submissions
-        JOIN creators ON submissions.creator_id = creators.id
-    ''')
+
+    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
+                      submissions.creator_id, submissions.status, submissions.submission_time
+                      FROM submissions 
+                      JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
-    conn.close()
-
-    # Prepare data for insertion
-    rows_to_add = [list(row) for row in all_submissions]
-
-    # Insert new data starting from the second row
+    
+    rows_to_add = []
+    for row in all_submissions:
+        rows_to_add.append([
+            row[0] if row[0] else 'Unknown',  # Username
+            row[1],  # Reel Link
+            row[2] if row[2] else 0,  # Views
+            row[3] if row[3] else 0,  # Earnings
+            row[4],  # Creator ID
+            row[5],  # Status
+            row[6],  # Date Submitted
+        ])
+    
     if rows_to_add:
-        sheet.insert_rows(rows_to_add, 2)
-        print("Google Sheets updated successfully.")
-    else:
-        print("No new data to sync.")
+        try:
+            headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
+            sheet.clear()
+            sheet.insert_row(headers, 1)  # Insert headers if they are missing
+            sheet.insert_rows(rows_to_add, row=2)  # Add data starting from row 2 (keeping headers intact)
+            print("Google Sheets updated successfully.")
+        except Exception as e:
+            print(f"Failed to update Google Sheets: {e}")
+
+    conn.close()
     
 def process_csv(file):
     conn = sqlite3.connect('submissions.db')
@@ -217,11 +218,18 @@ def connect_to_google_sheets():
     sheet = client.open("LXM Creator Data").worksheet("Earnings")
     return sheet
 
-def init_db():
+def create_database():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
-    # Submissions Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS creators (
+            id TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            cpm INTEGER NOT NULL
+        )
+    ''')
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS submissions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -229,25 +237,13 @@ def init_db():
             submission_time TEXT NOT NULL,
             status TEXT DEFAULT 'Pending',
             rejection_reason TEXT DEFAULT '',
-            creator_id TEXT NOT NULL
-        )
-    ''')
-
-    # Creators Table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS creators (
-            id TEXT PRIMARY KEY,
-            username TEXT NOT NULL,
-            cpm INTEGER NOT NULL,
-            email TEXT,
-            dashboard_link TEXT
+            creator_id TEXT NOT NULL,
+            FOREIGN KEY (creator_id) REFERENCES creators(id)
         )
     ''')
 
     conn.commit()
     conn.close()
-
-init_db()
 
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
@@ -298,23 +294,26 @@ def unhandled_exception(e):
 def submit(creator_id):
     if request.method == 'POST':
         reel_link = request.form.get('reel_link')
-        
-        # Make sure reel_link is not empty
-        if not reel_link or reel_link.strip() == '':
+        if not reel_link:
             return "Reel link cannot be empty", 400
-        
+
         submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
 
         try:
             conn = sqlite3.connect('submissions.db')
             cursor = conn.cursor()
             
+            # Check if creator exists
+            cursor.execute("SELECT username FROM creators WHERE id = ?", (creator_id,))
+            creator_row = cursor.fetchone()
+            
+            if not creator_row:
+                return "Creator not found. Please try again.", 400
+
             cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id) VALUES (?, ?, ?)",
                            (reel_link, submission_time, creator_id))
             conn.commit()
-            conn.close()
             
-            # Attempt to sync with Google Sheets, but don't crash if it fails
             try:
                 sync_to_google_sheets()
             except Exception as e:
@@ -325,8 +324,8 @@ def submit(creator_id):
         except Exception as e:
             print(f"Error during submission: {e}")
             return "Submission Failed. Please try again.", 500
-        
-    return render_template('submit.html', creator_id=creator_id)
+        finally:
+            conn.close()
             
 @app.route('/delete_creator', methods=['POST'])
 def delete_creator():
@@ -553,21 +552,14 @@ def add_creator():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    # Generate the submission link
-    submission_link = f"/submit/{creator_id}"
-    
-    # Generate the dashboard link by calling the Google Apps Script
-    dashboard_link = generate_dashboard_link(creator_id)
-    
-    # Insert new creator into the database, including the dashboard link
-    cursor.execute("INSERT OR REPLACE INTO creators (id, username, cpm, dashboard_link) VALUES (?, ?, ?, ?)",
-                   (creator_id, username, cpm, dashboard_link))
-    
-    conn.commit()
-    conn.close()
-    
-    # Add this line to sync with Google Sheets
-    sync_to_google_sheets()
+    try:
+        cursor.execute("INSERT OR REPLACE INTO creators (id, username, cpm) VALUES (?, ?, ?)", (creator_id, username, cpm))
+        conn.commit()
+        print(f"Creator {username} added successfully.")
+    except Exception as e:
+        print(f"Error adding creator: {e}")
+    finally:
+        conn.close()
     
     return redirect(url_for('manager'))
 
