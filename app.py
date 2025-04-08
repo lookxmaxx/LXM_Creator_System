@@ -15,7 +15,7 @@ import csv
 import logging
 import requests
 
-app = Flask(__name__)
+app = Flask(_name_)
 CORS(app)
 
 logging.basicConfig(level=logging.INFO)
@@ -26,19 +26,15 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Allowed Extensions for CSV
 ALLOWED_EXTENSIONS = {'csv'}
 
-# Load environment variables
 load_dotenv()
-app.secret_key = os.getenv("SECRET_KEY")
-MANAGER_PASSWORD = os.getenv("MANAGER_PASSWORD")
-GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+app.secret_key = os.getenv('SECRET_KEY')
+MANAGER_PASSWORD = os.getenv('MANAGER_PASSWORD')
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = GOOGLE_APPLICATION_CREDENTIALS
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
-
-# Load Pushbullet API Key from environment variable
-PUSHBULLET_API_KEY = "o.xO7PqwaZwbkTRUVsrupPjifLOkTlWsn4"
+PUSHBULLET_API_KEY = os.getenv('PUSHBULLET_API_KEY')
 pb = Pushbullet(PUSHBULLET_API_KEY)
 
 def normalize_url(url):
@@ -51,6 +47,7 @@ def normalize_url(url):
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    
 def normalize_url(url):
     parsed_url = urlparse(url)
     normalized_url = parsed_url._replace(scheme="https", netloc=parsed_url.netloc.lower(), path=parsed_url.path.rstrip('/'))
@@ -124,48 +121,6 @@ def determine_month_range(date_string):
     
     return f"{start_month_name} {start_date.year} - {end_month_name} {end_date.year}"
 
-def sync_to_google_sheets():
-    sheet = connect_to_google_sheets()
-    
-    # Define headers to be preserved
-    headers = ["Username", "Reel Link", "Views", "Earnings", "Creator ID", "Status", "Date Submitted"]
-
-    conn = sqlite3.connect('submissions.db')
-    cursor = conn.cursor()
-
-    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
-                      submissions.creator_id, submissions.status, submissions.submission_time
-                      FROM submissions 
-                      LEFT JOIN creators ON submissions.creator_id = creators.id''')
-    all_submissions = cursor.fetchall()
-    
-    rows_to_add = []
-    for row in all_submissions:
-        rows_to_add.append([
-            row[0],  # Username
-            row[1],  # Reel Link
-            row[2],  # Views
-            row[3],  # Earnings
-            row[4],  # Creator ID
-            row[5],  # Status
-            row[6],  # Date Submitted
-        ])
-    
-    if rows_to_add:
-        try:
-            existing_data = sheet.get_all_values()
-            
-            # Clear only data rows (leave headers intact)
-            if len(existing_data) > 1:
-                sheet.delete_rows(2, len(existing_data))
-            
-            # Add rows below the headers
-            sheet.insert_rows(rows_to_add, row=2)
-            print("Google Sheets updated successfully with Headers preserved.")
-        except Exception as e:
-            print(f"Failed to update Google Sheets: {e}")
-
-    conn.close()
     
 def process_csv(file):
     conn = sqlite3.connect('submissions.db')
@@ -223,7 +178,14 @@ def create_database():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
-    # Submissions Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS creators (
+            id TEXT PRIMARY KEY,
+            username TEXT NOT NULL,
+            cpm INTEGER NOT NULL
+        )
+    ''')
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS submissions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,56 +193,37 @@ def create_database():
             submission_time TEXT NOT NULL,
             status TEXT DEFAULT 'Pending',
             rejection_reason TEXT DEFAULT '',
-            creator_id TEXT NOT NULL
-        )
-    ''')
-
-    # Creators Table (Don't overwrite existing entries)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS creators (
-            id TEXT PRIMARY KEY,
-            username TEXT NOT NULL,
-            cpm INTEGER NOT NULL,
-            email TEXT,
-            dashboard_link TEXT
+            creator_id TEXT NOT NULL,
+            views INTEGER DEFAULT 0,
+            earnings REAL DEFAULT 0
         )
     ''')
 
     conn.commit()
     conn.close()
-
+    
 def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
-    all_data = sheet.get_all_values()
-    
+
+    headers = ['Username', 'Reel Link', 'Views', 'Earnings', 'Creator ID', 'Status', 'Date Submitted']
+
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
 
-    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
+    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings,
                       submissions.creator_id, submissions.status, submissions.submission_time
                       FROM submissions 
                       JOIN creators ON submissions.creator_id = creators.id''')
     all_submissions = cursor.fetchall()
-    
-    rows_to_add = []
-    for row in all_submissions:
-        rows_to_add.append([
-            row[0],  # Username
-            row[1],  # Reel Link
-            row[2],  # Views
-            row[3],  # Earnings
-            row[4],  # Creator ID
-            row[5],  # Status
-            row[6],  # Date Submitted
-        ])
-    
-    if rows_to_add:
-        try:
-            sheet.clear()  # Clear the entire sheet before writing new data
-            sheet.insert_rows(rows_to_add, row=2)
-            print("Google Sheets updated successfully.")
-        except Exception as e:
-            print(f"Failed to update Google Sheets: {e}")
+
+    rows_to_add = [headers] + [list(row) for row in all_submissions]
+
+    try:
+        sheet.clear()
+        sheet.insert_rows(rows_to_add)
+        print('Google Sheets updated successfully with headers preserved.')
+    except Exception as e:
+        print(f'Failed to update Google Sheets: {e}')
 
     conn.close()
     
@@ -298,26 +241,23 @@ def unhandled_exception(e):
 def submit(creator_id):
     if request.method == 'POST':
         reel_link = request.form.get('reel_link')
-        if not reel_link:
-            return "No reel link provided", 400
-
-        submission_time = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        submission_time = datetime.now().strftime('%Y-%m-%d %I:%M %p')
 
         conn = sqlite3.connect('submissions.db')
         cursor = conn.cursor()
 
-        try:
-            cursor.execute("INSERT INTO submissions (reel_link, submission_time, creator_id, status) VALUES (?, ?, ?, ?)",
-                           (reel_link, submission_time, creator_id, 'Pending'))
-            conn.commit()
-            sync_to_google_sheets()
-            return render_template('success.html', creator_id=creator_id)
-        except Exception as e:
-            conn.rollback()
-            print(f"Error during submission: {e}")
-            return f"Internal Server Error: {e}", 500
-        finally:
-            conn.close()
+        cursor.execute('SELECT * FROM creators WHERE id = ?', (creator_id,))
+        creator = cursor.fetchone()
+
+        if not creator:
+            return 'Invalid Creator ID', 400
+
+        cursor.execute('''INSERT INTO submissions (reel_link, submission_time, creator_id) 
+                          VALUES (?, ?, ?)''', (reel_link, submission_time, creator_id))
+        conn.commit()
+        sync_to_google_sheets()
+
+        return redirect(url_for('home'))
 
     return render_template('submit.html', creator_id=creator_id)
             
@@ -328,9 +268,9 @@ def delete_creator():
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
     
-    cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
-    cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
-    conn.commit()
+   cursor.execute("DELETE FROM creators WHERE id = ?", (creator_id,))
+   cursor.execute("DELETE FROM submissions WHERE creator_id = ?", (creator_id,))
+   conn.commit()
     conn.close()
 
     # Sync with Google Sheets
