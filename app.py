@@ -232,34 +232,50 @@ def init_db():
 
 init_db()
 
-def sync_from_google_sheets():
+def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
-    all_data = sheet.get_all_values()[1:]  # Skip the header row
-    
+    all_data = sheet.get_all_values()
+
+    # Extract existing Reel Links and their row indexes from the sheet
+    existing_links = {row[1]: index + 1 for index, row in enumerate(all_data[1:]) if len(row) > 1}  # Reel Link is in column 2
+
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
-    
-    # Fetch existing creators from the database
-    cursor.execute("SELECT id FROM creators")
-    existing_creators = {row[0] for row in cursor.fetchall()}
 
-    for row in all_data:
-        try:
-            username, reel_link, views, earnings, creator_id, status, submission_time, month_range = row
-            
-            # If the creator is not in the database, add them
-            if creator_id not in existing_creators:
-                cursor.execute('''INSERT OR IGNORE INTO creators (id, username, cpm) 
-                                  VALUES (?, ?, ?)''', (creator_id, username, 0))  # Default CPM is set to 0
-                
-                # Also, add submissions from Google Sheets that are not in the database
-                cursor.execute('''INSERT OR IGNORE INTO submissions (reel_link, submission_time, creator_id, status) 
-                                  VALUES (?, ?, ?, ?)''', (reel_link, submission_time, creator_id, status))
-            
-        except Exception as e:
-            print(f"Error syncing from Google Sheets: {e}")
+    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
+                      submissions.creator_id, submissions.status, submissions.submission_time
+                      FROM submissions 
+                      JOIN creators ON submissions.creator_id = creators.id''')
+    all_submissions = cursor.fetchall()
     
-    conn.commit()
+    rows_to_update = []
+    rows_to_add = []
+    
+    for row in all_submissions:
+        reel_link = row[1]
+        submission_data = [
+            row[0],  # Username
+            row[1],  # Reel Link
+            row[2],  # Views
+            row[3],  # Earnings
+            row[4],  # Creator ID
+            row[5],  # Status
+            row[6],  # Date Submitted
+        ]
+        
+        if reel_link in existing_links:
+            row_index = existing_links[reel_link]
+            sheet.update(f'A{row_index + 1}:G{row_index + 1}', [submission_data])  # Updating existing row
+        else:
+            rows_to_add.append(submission_data)  # Adding new rows only if they don't already exist
+    
+    if rows_to_add:
+        try:
+            sheet.insert_rows(rows_to_add, row=2)
+            print("Google Sheets updated successfully with new entries only.")
+        except Exception as e:
+            print(f"Failed to update Google Sheets: {e}")
+
     conn.close()
     
 @app.errorhandler(500)
