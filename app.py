@@ -114,8 +114,8 @@ def sync_to_google_sheets():
     sheet = connect_to_google_sheets()
     all_data = sheet.get_all_values()
     
-    # Retrieve existing data (to avoid overwriting)
-    existing_links = {row[1] for row in all_data[1:]}  # Collect all existing reel links
+    # Retrieve existing data
+    existing_data = {row[1]: row_index + 1 for row_index, row in enumerate(all_data[1:])}  # Start from index 1 to skip header
 
     conn = sqlite3.connect('submissions.db')
     cursor = conn.cursor()
@@ -127,32 +127,52 @@ def sync_to_google_sheets():
     all_submissions = cursor.fetchall()
     
     rows_to_add = []
+    rows_to_update = []
+    
     for row in all_submissions:
-        submission_date = row[6]  # Date Submitted
-        try:
-            month_range = determine_month_range(submission_date)  # Get the Month Range
-        except:
-            month_range = "Invalid Date"
-
-        if row[1] not in existing_links:  # Only add new links
+        username, reel_link, views, earnings, creator_id, status, submission_date = row
+        
+        if reel_link in existing_data:
+            # Prepare the updated row with the new status, keeping Month Range intact
+            row_index = existing_data[reel_link]
+            rows_to_update.append({
+                "index": row_index,
+                "data": [
+                    username,
+                    reel_link,
+                    views,
+                    earnings,
+                    creator_id,
+                    status,
+                    submission_date,
+                    all_data[row_index][7]  # Keep the existing Month Range as it is
+                ]
+            })
+        else:
+            # Prepare new rows to be added
             rows_to_add.append([
-                row[0],  # Username
-                row[1],  # Reel Link
-                row[2],  # Views
-                row[3],  # Earnings
-                row[4],  # Creator ID
-                row[5],  # Status
-                row[6],  # Date Submitted
-                month_range  # Add calculated Month Range here
+                username,
+                reel_link,
+                views,
+                earnings,
+                creator_id,
+                status,
+                submission_date,
+                ""  # Leaving Month Range empty as requested
             ])
     
-    if rows_to_add:
-        try:
-            # Append rows instead of deleting existing ones
+    try:
+        # Update existing rows (only status or other changes)
+        for row_to_update in rows_to_update:
+            sheet.update(f'A{row_to_update["index"] + 1}:H{row_to_update["index"] + 1}', [row_to_update["data"]])
+        
+        # Append new rows
+        if rows_to_add:
             sheet.append_rows(rows_to_add)
-            print("Google Sheets updated successfully with Month Range.")
-        except Exception as e:
-            print(f"Failed to update Google Sheets: {e}")
+        
+        print("Google Sheets updated successfully.")
+    except Exception as e:
+        print(f"Failed to update Google Sheets: {e}")
 
     conn.close()
 
