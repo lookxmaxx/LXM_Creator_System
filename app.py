@@ -111,33 +111,50 @@ def determine_month_range(date_string):
     return f"{start_month_name} {start_date.year} - {end_month_name} {end_date.year}"
 
 def sync_to_google_sheets():
-    try:
-        sheet = connect_to_google_sheets()
-        all_data = sheet.get_all_values()
+    sheet = connect_to_google_sheets()
+    all_data = sheet.get_all_values()
+    
+    # Retrieve existing data (to avoid overwriting)
+    existing_links = {row[1] for row in all_data[1:]}  # Collect all existing reel links
 
-        if len(all_data) > 1:
-            sheet.delete_rows(2, len(all_data))
-        
-        conn = sqlite3.connect('submissions.db')
-        cursor = conn.cursor()
+    conn = sqlite3.connect('submissions.db')
+    cursor = conn.cursor()
 
-        cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
-                          submissions.creator_id, submissions.status, submissions.submission_time
-                          FROM submissions 
-                          JOIN creators ON submissions.creator_id = creators.id''')
-        all_submissions = cursor.fetchall()
-        
-        rows_to_add = []
-        for row in all_submissions:
-            rows_to_add.append(list(row))
-        
-        if rows_to_add:
-            sheet.insert_rows(rows_to_add, row=2)
-            print("Google Sheets updated successfully.")
+    cursor.execute('''SELECT creators.username, submissions.reel_link, submissions.views, submissions.earnings, 
+                      submissions.creator_id, submissions.status, submissions.submission_time
+                      FROM submissions 
+                      JOIN creators ON submissions.creator_id = creators.id''')
+    all_submissions = cursor.fetchall()
+    
+    rows_to_add = []
+    for row in all_submissions:
+        submission_date = row[6]  # Date Submitted
+        try:
+            month_range = determine_month_range(submission_date)  # Get the Month Range
+        except:
+            month_range = "Invalid Date"
 
-        conn.close()
-    except Exception as e:
-        print(f"Error syncing with Google Sheets: {e}")
+        if row[1] not in existing_links:  # Only add new links
+            rows_to_add.append([
+                row[0],  # Username
+                row[1],  # Reel Link
+                row[2],  # Views
+                row[3],  # Earnings
+                row[4],  # Creator ID
+                row[5],  # Status
+                row[6],  # Date Submitted
+                month_range  # Add calculated Month Range here
+            ])
+    
+    if rows_to_add:
+        try:
+            # Append rows instead of deleting existing ones
+            sheet.append_rows(rows_to_add)
+            print("Google Sheets updated successfully with Month Range.")
+        except Exception as e:
+            print(f"Failed to update Google Sheets: {e}")
+
+    conn.close()
 
 def process_csv(file):
     conn = sqlite3.connect('submissions.db')
