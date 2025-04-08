@@ -162,14 +162,19 @@
         </form>
 
         <!-- Submissions Table with Filters -->
-        <h2>Submissions</h2>
-        <button onclick="filterTable('all')">All</button>
-        <button onclick="filterTable('pending')">Pending</button>
-        <button onclick="filterTable('approved')">Approved</button>
-        <button onclick="filterTable('rejected')">Rejected</button>
-        <input type="text" id="searchInput" onkeyup="searchTable()" placeholder="Search by Link">
+    <h2>Submissions</h2>
 
-    <table>
+<!-- Filter Buttons -->
+<a href="{{ url_for('manager', filter='All') }}">All</a> |
+<a href="{{ url_for('manager', filter='Pending') }}">Pending</a> |
+<a href="{{ url_for('manager', filter='Approved') }}">Approved</a> |
+<a href="{{ url_for('manager', filter='Rejected') }}">Rejected</a>
+
+<!-- Search Box -->
+<input type="text" id="searchInput" onkeyup="searchTable()" placeholder="Search by Link">
+
+<!-- Submissions Table -->
+<table>
     <thead>
         <tr>
             <th>Username</th>
@@ -188,17 +193,20 @@
             <td>{{ submission[3] }}</td>
             <td>
                 <div class="action-buttons">
+                    <!-- Approve Button -->
                     <form action="/update_submission" method="POST" style="display:inline;">
                         <input type="hidden" name="submission_id" value="{{ submission[0] }}">
                         <button name="action" value="approve" class="action-button approve-button">Approve</button>
                     </form>
 
+                    <!-- Reject Button -->
                     <form action="/update_submission" method="POST" style="display:inline;">
                         <input type="hidden" name="submission_id" value="{{ submission[0] }}">
                         <input type="text" name="rejection_reason" placeholder="Reason" required>
                         <button name="action" value="reject" class="action-button reject-button">Reject</button>
                     </form>
 
+                    <!-- Re-Review Button -->
                     <form action="/update_submission" method="POST" style="display:inline;">
                         <input type="hidden" name="submission_id" value="{{ submission[0] }}">
                         <button name="action" value="re-review" class="action-button rereview-button">Re-Review</button>
@@ -209,6 +217,30 @@
         {% endfor %}
     </tbody>
 </table>
+
+<!-- JavaScript for Search and Filtering -->
+<script>
+    function searchTable() {
+        var input, filter, table, tr, td, i, txtValue;
+        input = document.getElementById("searchInput");
+        filter = input.value.toUpperCase();
+        table = document.querySelector("table tbody");
+        tr = table.getElementsByTagName("tr");
+
+        for (i = 0; i < tr.length; i++) {
+            td = tr[i].getElementsByTagName("td")[1]; // Search Reel Link column
+            if (td) {
+                txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }       
+        }
+    }
+</script>
+
 
 
         <!-- Upload CSV Form -->
